@@ -1,0 +1,181 @@
+---
+title: "Fig2H_FFPE-A"
+author: "Javier Escudero"
+date: "2023-11-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading libraries
+```{r, message=FALSE}
+rm(list = ls())
+
+library(semla)
+library(infercnv)
+library(SpatialInferCNV)
+library(ggplot2)
+library(viridis)
+library(Polychrome)
+library(patchwork)
+library(gtools)
+library(ape)
+library(phylogram)
+library(gridExtra)
+library(RColorBrewer)
+library(scales)
+library(ggbio)
+library(gprofiler2)
+library(ggpubr)
+library(tidyverse)
+```
+
+Setting up directories
+```{r}
+st.dir <- "/Users/javierescudero/Documents/work/SIMPlex-seq/data/visium/human_BC/R_objects"
+cnv.dir <- "/Users/javierescudero/Documents/work/SIMPlex-seq/results/inferCNV/iCNV_outs/Visium/sc_ref/Rezas_manual-annot/clean_snREF"
+patho.dir <- "/Users/javierescudero/Documents/work/SIMPlex-seq/data/visium/human_BC"
+out.dir <- "~/Documents/work/SIMPlex-seq/results/inferCNV/analysis/cleaned_snREF-visClones"
+```
+
+Some global variables
+```{r}
+save_plots <- TRUE
+```
+
+# Summary
+Code required to recreate the spatial plot showed in Figure 2.G
+
+# Analysis
+## Load Visium data
+FFPE slide
+```{r}
+se.ffpe <-  readRDS(list.files(st.dir, pattern = "ffpe_2", full.names = TRUE))
+DefaultAssay(se.ffpe) <- "Spatial"
+
+se.ffpe@tools[["Staffli"]]@imgs <- str_subset(list.files("/Users/javierescudero/Documents/work/SIMPlex-seq/data/visium/human_BC/FFPE", pattern = "hires", full.names = TRUE, recursive = TRUE), pattern = paste(unique(se.ffpe$section.name), collapse = "|"))
+se.ffpe <- LoadImages(se.ffpe, image_height = 2000)
+```
+
+Loading annotation for FFPE slide
+```{r}
+ffpe.a <- read_csv(list.files(patho.dir, 
+                              full.names = TRUE, pattern = "V42L22-105_A1_Epithelial", recursive = TRUE)) %>%
+  drop_na(Epithelial)
+colnames(ffpe.a) <- c("barcode", "anno")
+ffpe.a <- ffpe.a %>% column_to_rownames(var = "barcode") 
+
+se.ffpe <- AddMetaData(se.ffpe, metadata = ffpe.a)
+```
+
+Define a function for loading inferCNV outs
+```{r}
+load_icnv_outs <- function(cnv_dir, sample_interest, file_to_look){
+  #Getting files from sample to focus on
+  sample_dir <- str_subset(list.dirs(cnv_dir, full.names = TRUE), sample_interest)  
+  sample_file <- list.files(sample_dir, full.names = TRUE, pattern = file_to_look)
+  #Loading file
+  if (str_detect(file_to_look, "dendrogram")){
+    loaded_file <- read.tree(file = sample_file)
+  } else {
+    loaded_file <- readRDS(file = sample_file)
+  }
+  
+  return(loaded_file)
+}
+```
+
+## Exploring V42L22-105_A1
+### Exploring dendrogram clusters
+Generating dendrogram for section
+```{r, eval=FALSE}
+dendrogram <- as.hclust(load_icnv_outs(cnv_dir = cnv.dir,
+                                       sample_interest = "V42L22-105_A1",
+                                       file_to_look = "infercnv.observations_dendrogram.txt"))
+```
+
+In this section it doesn't make that much sense to divide into 5 clusters. Looking at the heatmap, the whole sections looks to be very uniform, only the spots close to those annotated as *Normal* seem to be a bit different. Based on the above classification, the spots that are different fall under cluster 4. So we can rephrase the above clusters to: **if you are not in 4, you belong to the same cluster. If you are in 4, you are indeed distinct**
+```{r, eval=FALSE}
+spots.dendro <- data.frame(cutree(dendrogram, k = 5))
+colnames(spots.dendro) <- "icnv_clones"
+
+spots.dendro <- spots.dendro %>% 
+  mutate(icnv_clones = ifelse(icnv_clones == "4", "B", "A"))
+```
+
+Loading dendrogram
+```{r}
+dendrogram <- as.phylo(load_icnv_outs(cnv_dir = cnv.dir,
+                                       sample_interest = "V42L22-105_A1",
+                                       file_to_look = "infercnv.observations_dendrogram.txt"))
+```
+
+Manual selection of clones based on the dendrogram
+```{r}
+subtrees <- subtrees(dendrogram)
+png(paste0(cnv.dir,"/iCNV_V42L22-105_A1/phylo.png"),width=10000,height=2500, res = 300)
+plot(dendrogram,show.tip.label = FALSE)
+nodelabels(text=1:dendrogram$Nnode,node=1:dendrogram$Nnode+Ntip(dendrogram))
+dev.off()
+```
+
+Assigning spots to a icnv_clones manually depending on where they fall in the iCNV dendrogram. The clone calling I want to do is the following:
+  1. **Clone A:** spots under node 2807
+  2. **Clone B:** everything else
+```{r}
+nodes.interest <- c(2807,2831, 2926, 2)
+spots.dendro <- map_dfr(nodes.interest, function(node){
+  SelectingSubTreeData(subtrees, node)
+})
+```
+
+Formatting and adding to Seurat
+```{r}
+spots.dendro <- spots.dendro %>% 
+  column_to_rownames(var = "Barcode") %>% 
+  mutate(Node = ifelse(Node == "Node_2807", "A", 
+                       ifelse(str_detect(Node, "2831|2926|2"), "B","hm")))
+colnames(spots.dendro) <- "icnv_clones"
+```
+
+Adding dendrogram information to Seurat object
+```{r}
+se.sub <- SubsetSTData(se.ffpe, spots = rownames(spots.dendro))
+se.sub <- AddMetaData(se.sub, spots.dendro)
+```
+
+Spatial visualization of iCNV-based clusters
+```{r}
+plot <- MapLabels(se.sub , column_name = "icnv_clones", image_use = "raw",
+            pt_size = 1.5, override_plot_dims = FALSE, label_by = "section.name",
+            colors = viridis::viridis(n = length(unique(se.sub$icnv_clones))),
+            # colors =  RColorBrewer::brewer.pal(length(unique(se.sub$icnv_clones)), "Set1"),
+            pt_alpha = 1) &
+    guides(fill = guide_legend(override.aes = list(size = 9))) &
+    theme(legend.position = "right")
+
+plot
+
+plot.dir <- paste0(c(out.dir, "clone_spots"), collapse = "/")
+if(dir.exists(plot.dir)) {
+} else {
+  dir.create(plot.dir, recursive = TRUE)
+}
+
+if(save_plots == TRUE) {
+  ggsave(plot, 
+         filename = paste0(plot.dir, "/", unique(se.sub$section.name), "_clone_spots.pdf"),
+         width = 8, height = 8, units = "in")
+} else {
+}
+```
+
+# Metadata
+```{r}
+date()
+sessionInfo()
+```
+
+
