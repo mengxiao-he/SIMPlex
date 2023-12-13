@@ -1,0 +1,143 @@
+---
+title: "cleaning_FF_1"
+author: "Javier Escudero"
+date: "2023-09-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading libraries
+```{r}
+rm(list = ls())
+
+library(Seurat)
+library(infercnv)
+library(SpatialInferCNV)
+library(ggplot2)
+library(viridis)
+library(Polychrome)
+library(patchwork)
+library(gtools)
+library(ape)
+library(phylogram)
+library(gridExtra)
+library(RColorBrewer)
+library(scales)
+library(ggpubr)
+library(tidyverse)
+```
+
+Setting directories
+```{r}
+cnv.dir <- "/Users/javierescudero/Documents/work/SIMPlex-seq/results/inferCNV/iCNV_outs/single-nuclei/Rezas_manual-annot/ff/mammary"
+patho.dir <- "/Users/javierescudero/Documents/work/SIMPlex-seq/data/visium/human_BC/FF/BC_FF_annotations"
+out_dir <- function(i){
+  paste0("/Users/javierescudero/Documents/work/SIMPlex-seq/data/iCNV/Visium/",i,"_for_object/sc_ref/Rezas_manual-annot/clean_snREF")
+}
+```
+
+# Summary
+In this markdown I am refining the reference in the single nuclei data based on iCNV outs and creating the annotation file for Visium + single nuclei ref runs
+
+However, we get some signal in our single-nuclei data. We can see in the heatmaps some cells that potentially can have some rearrangements.
+
+# Analysis
+## Identifying healthy nuclei
+### Loading iCNV outs
+Function
+```{r}
+load_icnv_outs <- function(cnv_dir, sample_interest, file_to_look){
+  #Getting files from sample to focus on
+  sample_dir <- str_subset(list.dirs(cnv_dir, full.names = TRUE), sample_interest)  
+  sample_file <- list.files(sample_dir, full.names = TRUE, pattern = file_to_look)
+  #Loading file
+  if (str_detect(file_to_look, "dendrogram")){
+    loaded_file <- read.tree(file = sample_file)
+  } else {
+    loaded_file <- readRDS(file = sample_file)
+  }
+  
+  return(loaded_file)
+}
+```
+
+Loading inferCNV results for sample
+```{r}
+sn.cnv <- load_icnv_outs(cnv_dir = paste(c(cnv.dir), collapse = "/"),
+                         sample_interest = "BC_1_2",
+                         file_to_look = "run.final.infercnv_obj")
+```
+
+Loading dendrogram for sample
+```{r}
+dendrogram <- as.phylo(load_icnv_outs(cnv_dir = paste(c(cnv.dir), collapse = "/"),
+                                       sample_interest = "BC_1_2",
+                                       file_to_look = "infercnv.observations_dendrogram.txt"))
+```
+
+### Selecting healthy cells
+The approach to grabbing healthy cells that I am going to take will be to look at the dendrogram and then grab those cells that fall in the branch that I want.
+```{r}
+subtrees <- subtrees(dendrogram)
+png(paste0(cnv.dir,"/iCNV_BC_1_2/phylo.png"),width=10000,height=2500, res = 300)
+plot(dendrogram,show.tip.label = FALSE)
+nodelabels(text=1:dendrogram$Nnode,node=1:dendrogram$Nnode+Ntip(dendrogram))
+dev.off()
+```
+
+After looking at the dendrogram with the node numbers, I have decided that cells under node 2 look a bit sick. Therefore, I want to keep those that fall under node 52
+```{r}
+nodes.interest <- c(52)
+nuclei.nodes <- map_dfr(nodes.interest, function(node){
+  SelectingSubTreeData(subtrees, node)
+})
+```
+
+Now that I know which spots are going to be used as a reference, let's prepare the new annotation dataframes for inferCNV
+```{r}
+sn.anno <- nuclei.nodes %>% 
+  mutate(anno = paste("ref-", names(sn.cnv@observation_grouped_cell_indices), sep = "")) %>% 
+  select(c(Barcode, anno))
+```
+
+## Gathering Visium annotation
+First let's load the QCed data, as there are spots annotated that didnt make it past QC and if I include them in the annotation but not in the count data we are going to get an error
+```{r}
+st.cnt <- colnames(read_tsv(list.files("/Users/javierescudero/Documents/work/SIMPlex-seq/data/iCNV/Visium/counts_for_object/st_ref/mengiQC_whole",
+                                      pattern =  "302_B", full.names = TRUE)))
+```
+
+Reading the pathologist annotation for the Visium section
+```{r}
+st.anno <- read_csv(paste0(patho.dir,"/Máté_V52L18-302_B.csv"))
+colnames(st.anno) <- c("Barcode", "anno")
+st.anno <- filter(st.anno, str_detect(anno, pattern = "Tumor-stroma|Tumor rich|DCIS|Normal ductal epithelium")) %>% 
+  filter(Barcode %in% st.cnt)
+```
+
+Merging into one annotation dataframe the single nuclei and the Visium
+```{r}
+anno.df <- rbind(st.anno, sn.anno)
+```
+
+## Exporting iCNV input
+```{r}
+# exporting
+write_tsv(anno.df, 
+          file = paste0(out_dir("anno"), "/V52L18-302_B.tsv"), 
+          col_names = FALSE)
+```
+
+# Meta
+```{r}
+date()
+sessionInfo()
+```
+
+
+
+
+

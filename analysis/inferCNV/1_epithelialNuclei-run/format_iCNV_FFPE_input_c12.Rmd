@@ -1,0 +1,238 @@
+---
+title: "format_iCNV_FFPE_input_c12"
+author: "Javier Escudero"
+date: "2023-11-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading libraries
+```{r}
+rm(list = ls())
+
+library(Seurat)
+library(tidyverse)
+```
+
+Setting directories
+```{r}
+sn.dir <- "/home/javier.escudero/work/SIMPlex_seq/data/single-nuclei/ffpe"
+out_dir <- function(i, j){
+  paste0("~/work/SIMPlex_seq/data/iCNV/",i,"_for_object/single-nuclei/Rezas_manual-annot/ffpe/",j)
+}
+```
+
+# Summary
+The goal of this markdown is to rerun inferCNV for the latest annotation of the single-nuclei curated by Reza. This markdown is to prepare a run for the healthy cluster of the FFPE section of interest. So it will be a run of only the healthy nuclei and then we will see if we detect some CNVs to properly select the healthy nuclei
+
+Exporting all the count data for the single nuclei, as well as the annotation information. From FFPE, the sample of interest is that one labelled as **FFPE_2**, which corresponds to **section A1**. We also want to look at D1 just in case, so **FFPE_1** corresponds to **section D1**
+After talking with Mengi Zaneta and Reza, the cluster that looks the most healthy is cluster 12, which corresponds to **Epithelial and vascular smooth muscle** in **FFPE 1, section D1**, and **luminal epithelial cells/epithelial cells 12** in **FFPE 2, section A1**. So, in this markdown, I am going to prepare the input files for this: counts will be all the nuclei, annotation will be only cluster 12
+
+# Analysis
+## Loading data
+The curated nuclei are stored in 2 rds objects shared by Mengxiao on google drive.
+```{r}
+se.1 <- readRDS(list.files(sn.dir, full.names = TRUE, pattern = "FFPE_1"))
+se.2 <- readRDS(list.files(sn.dir, full.names = TRUE, pattern = "FFPE_2"))
+```
+
+## Quick QC check
+We are working with Chromium (not really, it is single nuclei) sequencing data. Inside inferCNV there is this cutoff metric that removes genes with less than cutoff average counts. We can quickly explore our data to have an overview of the depth of sequencing and a pointer for what cutoff we might need.
+
+Sorted sum of reads per cell and average reads per gene. Since I want to export only the cancer and epithelial cells, let's focus on that count data
+```{r, fig.width=9}
+se <- merge(se.1,se.2)
+se <- subset(se, subset = SCT_snn_res.0.8 == 12)
+# se.sub <- subset(se, 
+#                  subset = SCT_snn_res.0.8 == 12)
+
+p1 <- ggplot(se[[]], aes(x = .data[["sample"]], y = nFeature_RNA + 1,
+                             fill = .data[["manual_annot_0.8"]])) +
+  geom_violin(scale = "count") +
+  geom_boxplot(width=0.1, color = "darkgreen") +
+  geom_jitter(size = 0.5)  +
+  facet_grid(~.data[["manual_annot_0.8"]], scales = "free", space = "free") +
+  scale_y_log10() +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1),text = element_text(size=14),
+        legend.text = element_text(size = 10)) +
+  geom_hline(yintercept = 500, linetype = "dashed", color = "red", 
+             linewidth = 3) +
+  scale_fill_manual(values = viridis::turbo(n = length(unique(se$manual_annot_0.8)))) +
+  ggtitle("Sum of reads per cell per sample")
+
+plot_df <- map_dfr(unique(se$sample), function(id){
+  se_sub <- subset(se, subset = sample == id)
+  counts <- t(as.matrix(GetAssayData(se_sub, slot = "counts"))) %>%
+    as_tibble(.name_repair = "minimal", rownames= NA) %>% 
+    colMeans() %>% 
+    as.data.frame() %>% 
+    rownames_to_column(var = "gene_id") %>% 
+    mutate(sample = id)
+  colnames(counts) <- c("gene_id", "avg_counts", "sample")
+  
+  return(counts)
+})
+
+p2 <- ggplot(plot_df, 
+             aes(x = .data[["sample"]], y = avg_counts,
+                 fill = .data[["sample"]])) +
+  geom_violin(scale = "count") +
+  geom_boxplot(width=0.1, color = "darkgreen") +
+  geom_jitter(size = 0.5)  +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1),text = element_text(size=14),
+        legend.text = element_text(size = 10)) +
+  geom_hline(yintercept = 0.1, linetype = "dashed", color = "red", 
+             linewidth = 3) +
+  geom_label(data = . %>% group_by(sample) %>% filter(avg_counts == max(avg_counts)), 
+             aes(label = gene_id)) +
+  annotate("text", x=1, y=10, 
+           label = paste0("FFPE_1 genes above 0.1: ", table((plot_df %>% filter(avg_counts >=0.1))$sample)[1])) +
+  annotate("text", x=2, y=10, 
+           label = paste0("FFPE_2 genes above 0.1: ", table((plot_df %>% filter(avg_counts >=0.1))$sample)[2])) +
+  ggtitle("Avg counts of each gene in each SIMPlex")
+
+p1
+p2
+```
+
+```{r, fig.width=9}
+aga <- read_tsv(list.files("~/work/SIMPlex_seq/data/iCNV/counts_for_object/Visium/sc_ref/Rezas_manual-annot/merged",pattern = "D1", full.names = TRUE))
+
+sn.bc <- data.frame(barcode = colnames(se))
+all.bc <- data.frame(barcode = colnames(aga)[-1])
+int.bc <- all.bc %>% 
+  mutate(keep = ifelse(nchar(barcode) == 18, "yes", "no")) %>% 
+  filter(keep == "yes") %>% pull(barcode)
+# int.bc <- all.bc %>% 
+#   mutate(keep = ifelse(nchar(barcode) == 18, "yes", 
+#                        ifelse(barcode %in% sn.bc$barcode, "yes", "no"))) %>% 
+#   filter(keep == "yes") %>% pull(barcode)
+
+
+plot_df <- aga %>% 
+  column_to_rownames(var = "gene_id")
+plot_df <- as.data.frame(t(plot_df)) %>% 
+  colMeans() %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "gene_id") %>% 
+  mutate(sample = "D1")
+colnames(plot_df) <- c("gene_id", "avg_counts", "sample")
+
+p2 <- ggplot(plot_df, 
+             aes(x = .data[["sample"]], y = avg_counts,
+                 fill = .data[["sample"]])) +
+  geom_violin(scale = "count") +
+  geom_boxplot(width=0.1, color = "darkgreen") +
+  geom_jitter(size = 0.5)  +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1),text = element_text(size=14),
+        legend.text = element_text(size = 10)) +
+  geom_hline(yintercept = 0.1, linetype = "dashed", color = "red", 
+             linewidth = 3) +
+  geom_label(data = . %>% group_by(sample) %>% filter(avg_counts == max(avg_counts)), 
+             aes(label = gene_id)) +
+  annotate("text", x=1, y=10, 
+           label = paste0("FFPE_1 Visium genes above 0.1: ", 
+                          table((plot_df %>% filter(avg_counts >=0.1))$sample)[1]))  +
+  ggtitle("Avg counts of each gene in each SIMPlex")
+
+p2
+```
+
+
+## Gathering the annotation information
+Reza manually annotated the clusters stored in *SCT_snn_res.0.8*. The proper name of the clusters is in *manual_annot_0.8*. I want only the epithelial nuclei
+```{r}
+# Section A
+anno.2 <- se.2[[]] %>% select(c(manual_annot_0.8, SCT_snn_res.0.8)) %>% 
+  filter(SCT_snn_res.0.8 == 12) %>%
+  rownames_to_column(var = "barcode")
+
+# Section D
+anno.1 <- se.1[[]] %>% select(manual_annot_0.8, SCT_snn_res.0.8) %>%
+  filter(SCT_snn_res.0.8 == 12) %>%
+  rownames_to_column(var = "barcode")
+```
+
+## Crafting count data and exporting
+Get counts function
+```{r}
+#' Get in a nice dataframe the counts of a Visium section
+#' 
+#' @param se_obj Seurat object containing the ST data
+#' @param slt String indicating the slot from which to extract the count data (counts/data)
+#' @param spots_as String indicating if you want the spot_ids as column or rows
+#' @param spots_keep Vector of strings giving which spots you wish to keep.
+#' @returns A dataframe with the count data.
+get_st_cnt <- function(se_obj, slt = "counts", spots_as, spots_keep = NULL){
+  if(is.null(spots_keep)){
+    spots_keep <- colnames(se_obj)
+  }
+  if(spots_as == "row"){
+    counts <- t(as.matrix(GetAssayData(se_obj, slot = slt))) %>%
+      as_tibble(.name_repair = "minimal", rownames= NA) %>%
+      rownames_to_column(var="spot_id") %>%
+      filter(spot_id %in% spots_keep)
+  } else if (spots_as == "col"){
+    counts <- as.matrix(GetAssayData(se_obj, slot = slt)) %>%
+      as_tibble(.name_repair = "minimal", rownames= NA) %>% 
+      rownames_to_column(var="gene_id")
+    if(is.null(spots_keep)){
+      counts <- counts
+    } else (
+      counts <- counts[, c("gene_id", spots_keep)]
+    )
+  } else {
+    warning("Either -col- or -row-")
+  }
+  
+  return(counts)
+}
+```
+
+Section A
+```{r}
+cnt_df <- get_st_cnt(se_obj = se.2,
+                     slt = "counts",
+                     spots_as = "col")
+# exporting
+write_tsv(anno.2 %>% select(c(barcode, manual_annot_0.8)),
+          file = out_dir("anno", "FFPE_2.tsv"),
+          col_names = FALSE)
+write_tsv(cnt_df,
+          file = out_dir("counts", "FFPE_2.tsv"))
+```
+Section D
+```{r}
+cnt_df <- get_st_cnt(se_obj = se.1,
+                     slt = "counts",
+                     spots_as = "col")
+# exporting
+write_tsv(anno.1 %>% select(c(barcode, manual_annot_0.8)),
+          file = out_dir("anno", "FFPE_1.tsv"),
+          col_names = FALSE)
+write_tsv(cnt_df,
+          file = out_dir("counts", "FFPE_1.tsv"))
+```
+
+# Metadata
+```{r}
+date()
+sessionInfo()
+```
+
+
+
+
+
+
+
+
+
+
+
