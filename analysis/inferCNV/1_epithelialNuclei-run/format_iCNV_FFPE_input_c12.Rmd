@@ -26,10 +26,10 @@ out_dir <- function(i, j){
 ```
 
 # Summary
-The goal of this markdown is to rerun inferCNV for the latest annotation of the single-nuclei curated by Reza. This markdown is to prepare a run for the healthy cluster of the FFPE section of interest. So it will be a run of only the healthy nuclei and then we will see if we detect some CNVs to properly select the healthy nuclei
+This markdown is to prepare a run for the benign cluster of the FFPE section of interest. 
 
 Exporting all the count data for the single nuclei, as well as the annotation information. From FFPE, the sample of interest is that one labelled as **FFPE_2**, which corresponds to **section A1**. We also want to look at D1 just in case, so **FFPE_1** corresponds to **section D1**
-After talking with Mengi Zaneta and Reza, the cluster that looks the most healthy is cluster 12, which corresponds to **Epithelial and vascular smooth muscle** in **FFPE 1, section D1**, and **luminal epithelial cells/epithelial cells 12** in **FFPE 2, section A1**. So, in this markdown, I am going to prepare the input files for this: counts will be all the nuclei, annotation will be only cluster 12
+The cluster that looks the most benign is cluster 12, which corresponds to **Epithelial and vascular smooth muscle** in **FFPE 1, section D1**, and **luminal epithelial cells/epithelial cells 12** in **FFPE 2, section A1**. So, in this markdown, I am going to prepare the input files for this: counts will be all the nuclei, annotation will be only cluster 12
 
 # Analysis
 ## Loading data
@@ -146,7 +146,7 @@ p2
 
 
 ## Gathering the annotation information
-Reza manually annotated the clusters stored in *SCT_snn_res.0.8*. The proper name of the clusters is in *manual_annot_0.8*. I want only the epithelial nuclei
+Clusters are stored in *SCT_snn_res.0.8*. The proper name of the clusters is in *manual_annot_0.8*. I want only the epithelial nuclei
 ```{r}
 # Section A
 anno.2 <- se.2[[]] %>% select(c(manual_annot_0.8, SCT_snn_res.0.8)) %>% 

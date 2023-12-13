@@ -26,7 +26,7 @@ out_dir <- function(i, j){
 ```
 
 # Summary
-The goal of this markdown is to export an annotation file for only the **mammary epithelial** cluster of the FF nuclei data. These nuclei are the healthy cluster, so we should run inferCNV on them to truly select the healthy cohort that we can then use on the ST data
+The goal of this markdown is to export an annotation file for only the **mammary epithelial** cluster of the FF nuclei data. These nuclei are the benign cluster, so we should run inferCNV on them to truly select the benign cohort that we can then use on the ST data
 
 # Analysis
 ## Loading sn data
@@ -36,7 +36,7 @@ se <- readRDS(list.files(sn.dir , pattern = "snBC_1_cellbender_manual_annot.rds"
 ```
 
 ## Set up input data
-So we want to run only for the nuclei annotated as diseased or as epithelial. In this seurat we have both samples, so we have to export annotation and counts for each sample
+So we want to run only for the nuclei annotated as *Mammary*. In this seurat we have both samples, so we have to export annotation and counts for each sample
 ```{r}
 #' Get in a nice dataframe the counts of a Visium section
 #' 
