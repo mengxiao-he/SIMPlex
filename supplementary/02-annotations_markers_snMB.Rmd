@@ -1,0 +1,96 @@
+---
+title: "Supplementary Mouse Brain Nuclei"
+author: "Mengxiao"
+date: "2024-01-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r package, message='hide',warning='hide',results='hold'}
+suppressMessages(require(Seurat))
+suppressMessages(require(Matrix))
+suppressMessages(require(tidyverse))
+suppressMessages(require(patchwork))
+suppressMessages(require(ggplot2))
+```
+
+## Load data
+
+```{r loaddata,message='hide',warning='hide',results='hold'}
+# Load MB sample (cellbender processed)
+snMB <- readRDS(file = "mouse_brain/snRNA.rds")
+```
+
+## Markers and dotplot for label transfered cell type annotations
+
+```{r dotplot, fig.height=14, fig.width=14}
+#Subclass
+Idents(snMB) <- snMB$subclass
+sn.markers.subclass <- FindAllMarkers(snMB, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25, verbose = FALSE)
+sn.markers.subclass %>% group_by(cluster) %>% slice_max(n = 5, order_by = avg_log2FC)
+write.csv(sn.markers.subclass, "mouse_brain/top5_markers_subclass.csv", row.names = FALSE)
+
+AllMarkers.F <- sn.markers.subclass %>%
+  filter(p_val_adj < 0.01)
+
+top5CL <- AllMarkers.F %>%
+  group_by(cluster) %>%
+  arrange(as.numeric(cluster)) %>%
+  top_n(wt = avg_log2FC, n = 5)
+
+DotPlot(snMB, 
+        features = unique(top5CL$gene), 
+        col.min = 0, 
+        dot.min = 0, 
+        dot.scale = 5,
+        group.by = "subclass") + 
+  RotatedAxis() + 
+  xlab('Marker genes') + 
+  ylab('Samples') + 
+  scale_y_discrete(limits=rev) + 
+  scale_x_discrete(position = "top") + 
+  theme(text = element_text(size = 10), 
+        axis.text.x=element_text(size=14),
+        axis.text.x.top = element_text(margin = margin(b = 1), hjust = 0),
+        axis.text.y=element_text(size=12), 
+        legend.direction="horizontal", 
+        legend.position = "top")
+
+#Tax4
+Idents(snMB) <- snMB$tax4
+sn.markers.tax4 <- FindAllMarkers(snMB, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25, verbose = FALSE)
+sn.markers.tax4 %>% group_by(cluster) %>% slice_max(n = 5, order_by = avg_log2FC)
+write.csv(sn.markers.tax4, "mouse_brain/top5_markers_tax4.csv", row.names = FALSE)
+
+AllMarkers.F <- sn.markers.tax4 %>%
+  filter(p_val_adj < 0.01)
+
+top5CL <- AllMarkers.F %>%
+  group_by(cluster) %>%
+  arrange(as.numeric(cluster)) %>%
+  top_n(wt = avg_log2FC, n = 5)
+
+DotPlot(snMB, 
+        features = unique(top5CL$gene), 
+        col.min = 0, 
+        dot.min = 0, 
+        dot.scale = 8,
+        group.by = "tax4") + 
+  RotatedAxis() + 
+  xlab('Marker genes') + 
+  ylab('Samples') + 
+  scale_y_discrete(limits=rev) + 
+  scale_x_discrete(position = "top") + 
+  theme(text = element_text(size = 10), 
+        axis.text.x=element_text(size=14),
+        axis.text.x.top = element_text(margin = margin(b = 1), hjust = 0),
+        axis.text.y=element_text(size=14), 
+        legend.direction="horizontal", 
+        legend.position = "top")
+```
+
