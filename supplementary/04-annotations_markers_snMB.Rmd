@@ -1,0 +1,91 @@
+---
+title: "Supplementary Mouse Brain Nuclei"
+author: "Mengxiao"
+date: "2024-01-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r package, message='hide',warning='hide',results='hold'}
+suppressMessages(require(Seurat))
+suppressMessages(require(Matrix))
+suppressMessages(require(tidyverse))
+suppressMessages(require(patchwork))
+suppressMessages(require(ggplot2))
+suppressMessages(require(scCustomize))
+```
+
+## Load data
+
+```{r loaddata,message='hide',warning='hide',results='hold'}
+# Load MB sample (cellbender processed)
+snMB <- readRDS(file = "mouse_brain/snRNA.rds")
+```
+
+## UMAP
+
+```{r allen_highlight_plot}
+#Select cortex layer cell types
+L2_3_IT <- WhichCells(snMB, idents = c("L2/3 IT"))
+L4 <- WhichCells(snMB, idents = c("L4"))
+L5_IT <- WhichCells(snMB, idents = c("L5 IT"))
+L5_PT <- WhichCells(snMB, idents = c("L5 PT"))
+L6_CT <- WhichCells(snMB, idents = c("L6 CT"))
+L6_IT <- WhichCells(snMB, idents = c("L6 IT"))
+L6b <- WhichCells(snMB, idents = c("L6b"))
+
+cells <- list("L2/3 IT" = L2_3_IT,
+              "L4" = L4,
+              "L5 IT" = L5_IT,
+              "L5 PT" = L5_PT,
+              "L6 CT" = L6_CT,
+              "L6 IT" = L6_IT,
+              "L6b" = L6b)
+
+Cell_Highlight_Plot(seurat_object = snMB, cells_highlight = cells, 
+                    highlight_color = c("#332288", "#88CCEE", "#44AA99", "#117733", "#DDCC77", "#CC6677","#AA4499"))
+```
+
+## Markers and dotplot for label transfered cell type annotations
+
+```{r dotplot, fig.height=14, fig.width=14}
+Idents(snMB) <- snMB$allen_cortex
+sn.markers.allen <- FindAllMarkers(snMB, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25, verbose = FALSE)
+sn.markers.allen %>% group_by(cluster) %>% slice_max(n = 5, order_by = avg_log2FC)
+write.csv(sn.markers.allen, "mouse_brain/top5_markers_allen.csv", row.names = FALSE)
+
+AllMarkers.F <- sn.markers.allen %>%
+  filter(p_val_adj < 0.01)
+
+top5CL <- AllMarkers.F %>%
+  group_by(cluster) %>%
+  arrange(as.numeric(cluster)) %>%
+  top_n(wt = avg_log2FC, n = 5)
+
+top5CL <- subset(top5CL, cluster %in% c("L2/3 IT", "L4", "L5 IT", "L5 PT", "L6 CT", "L6 IT", "L6b"))
+snMB_subset <- subset(snMB, idents = c("L2/3 IT", "L4", "L5 IT", "L5 PT", "L6 CT", "L6 IT", "L6b"))
+
+DotPlot(snMB_subset, 
+        features = unique(top5CL$gene),
+        col.min = 0, 
+        dot.min = 0, 
+        dot.scale = 8,
+        group.by = "allen_cortex") + 
+  RotatedAxis() + 
+  xlab('Marker genes') + 
+  ylab('Samples') + 
+  scale_y_discrete(limits=rev) + 
+  scale_x_discrete(position = "top") + 
+  theme(text = element_text(size = 10), 
+        axis.text.x=element_text(size=14),
+        axis.text.x.top = element_text(margin = margin(b = 1), hjust = 0),
+        axis.text.y=element_text(size=12), 
+        legend.direction="horizontal", 
+        legend.position = "top")
+```
+
