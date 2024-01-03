@@ -27,7 +27,7 @@ suppressMessages(require(ggpubr))
 ```{r loaddata,message='hide',warning='hide',results='hold'}
 # Load samples
 SIMPlex_snMB.data <- Seurat::Read10X_h5(
-  filename = "SIMPlex_mb/sample_filtered_feature_bc_matrix.h5",
+  filename = "mouse_brain/sample_filtered_feature_bc_matrix.h5",
   use.names = T)
 MB_SIMPlex <- CreateSeuratObject(SIMPlex_snMB.data,  project = "SIMPlex")
 MB_SIMPlex$sample <- "MB_2"
