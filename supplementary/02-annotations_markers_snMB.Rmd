@@ -26,6 +26,20 @@ suppressMessages(require(ggplot2))
 snMB <- readRDS(file = "mouse_brain/snRNA.rds")
 ```
 
+## UMAP
+
+```{r umap_annotations}
+#Subtype
+DimPlot(snMB, reduction = "umap", group.by = "subclass", label = TRUE, repel = TRUE, label.size = 5, pt.size = 1) + 
+  ggtitle("SIMPlex snMB - label transfer (Mouse Brain Atlas)", subtitle = "Subclass") + 
+  guides(color=guide_legend(ncol =1))
+
+#Taxonomy level 4
+DimPlot(snMB, reduction = "umap", group.by = "tax4", pt.size = 1) + 
+  ggtitle("SIMPlex snMB - label transfer (Mouse Brain Atlas)", subtitle = "TaxonomyRank4") + 
+  guides(color=guide_legend(ncol =1))
+```
+
 ## Markers and dotplot for label transfered cell type annotations
 
 ```{r dotplot, fig.height=14, fig.width=14}
@@ -80,7 +94,7 @@ DotPlot(snMB,
         col.min = 0, 
         dot.min = 0, 
         dot.scale = 8,
-        group.by = "tax4") + 
+        group.by = "") + 
   RotatedAxis() + 
   xlab('Marker genes') + 
   ylab('Samples') + 
