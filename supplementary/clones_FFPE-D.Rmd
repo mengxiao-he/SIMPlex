@@ -95,13 +95,13 @@ dendrogram <- as.hclust(load_icnv_outs(cnv_dir = cnv.dir,
                                        file_to_look = "infercnv.observations_dendrogram.txt"))
 ```
 
-In this section it doesn't make that much sense to divide into 5 clusters. Looking at the heatmap, the whole sections looks to be very uniform, only the spots close to those annotated as *Normal* seem to be a bit different. Based on the above classification, the spots that are different fall under cluster 4. So we can rephrase the above clusters to: **if you are not in 4, you belong to the same cluster. If you are in 4, you are indeed distinct**
+In this section it doesn't make that much sense to divide into 5 clusters. Looking at the heatmap, the whole sections looks to be very uniform, only the spots close to those annotated as *Normal* seem to be a bit different. Based on the above classification, the spots that are different fall under cluster 1. So we can rephrase the above clusters to: **if you are not in 1, you belong to the same cluster. If you are in 1, you are indeed distinct**
 ```{r, eval=FALSE}
 spots.dendro <- data.frame(cutree(dendrogram, k = 5))
 colnames(spots.dendro) <- "icnv_clones"
 
 spots.dendro <- spots.dendro %>% 
-  mutate(icnv_clones = ifelse(icnv_clones == "4", "B", "A"))
+  mutate(icnv_clones = ifelse(icnv_clones == "1", "A", "B"))
 ```
 
 Loading dendrogram
