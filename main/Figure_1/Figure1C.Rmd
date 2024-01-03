@@ -1,0 +1,89 @@
+---
+title: "Figure1C"
+author: "Mengxiao"
+date: "2024-01-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and data
+
+Load libraries
+
+```{r package, message='hide',warning='hide',results='hold'}
+suppressMessages(require(Seurat))
+suppressMessages(require(Matrix))
+suppressMessages(require(tidyverse))
+suppressMessages(require(patchwork))
+suppressMessages(require(ggplot2))
+suppressMessages(require(ggpubr))
+```
+
+## Load data
+
+```{r loaddata,message='hide',warning='hide',results='hold'}
+# Load samples
+SIMPlex_snMB.data <- Seurat::Read10X_h5(
+  filename = "SIMPlex_mb/sample_filtered_feature_bc_matrix.h5",
+  use.names = T)
+MB_SIMPlex <- CreateSeuratObject(SIMPlex_snMB.data,  project = "SIMPlex")
+MB_SIMPlex$sample <- "MB_2"
+
+#Load 10x ref
+MFB_10x.data <- Seurat::Read10X_h5(
+  filename = "10k_mouse_forebrain_scFFPE_singleplex/10k_mouse_forebrain_scFFPE_singleplex_count_sample_filtered_feature_bc_matrix.h5",
+  use.names = T)
+MFB_10x <- CreateSeuratObject(MFB_10x.data,  project = "SIMPlex")
+MFB_10x$sample <- "MFB_10x"
+
+# Merge
+snMB <- merge(MB_SIMPlex, MFB_10x, add.cell.ids = c("MB_SIMPlex", "MFB_10x"), project = "multi_mod")
+```
+
+## Plot QC
+
+```{r qcplot,message='hide',warning='hide', results='hold',results='hold',fig.height=10,fig.width=20}
+x <- VlnPlot(snMB, features = "nFeature_RNA", pt.size = 0, group.by = "sample") + NoLegend()
+y <- VlnPlot(snMB, features = "nCount_RNA", pt.size = 0, group.by = "sample", y.max = 100000) + NoLegend()
+x | y
+```
+
+## Scatterplot comparison
+
+```{r scatter, fig.height=6, fig.width=8}
+gene_attr <- do.call(rbind, lapply(unique(snMB$sample), function(i) {
+  umis <- GetAssayData(snMB, slot = "counts", assay = "RNA")[, snMB$sample %in% i]
+  gene_attr <- data.frame(gene = rownames(umis),
+                        counts = Matrix::rowSums(umis), 
+                        det_rate = Matrix::rowMeans(umis > 0),
+                        dataset = i)
+}))
+gene_attr$log10_count <- log10(gene_attr$counts + 1)
+
+Log10counts <- spread(data = gene_attr[, c(1, 4, 5)], key = "dataset", value = "log10_count")
+DetRate <- spread(data = gene_attr[, c(1, 3, 4)], key = "dataset", value = "det_rate")
+
+p1 <- ggplot(Log10counts, aes(x=MB_SIMPlex, y=MFB_10x)) + 
+  geom_point()+
+  geom_smooth(method=lm)+
+  stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)+
+  geom_abline(intercept = 0, slope = 1, color = "red")+
+  labs(title="Log_10 counts")
+
+p2 <- ggplot(DetRate, aes(x=MB_SIMPlex, y=MFB_10x)) + 
+  geom_point()+
+  geom_smooth(method=lm)+
+  stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)+
+  geom_abline(intercept = 0, slope = 1, color = "red")+
+  labs(title="Detection rate")
+
+p1 - p2
+```
+
+## Session info
+```{r session_info}
+sessionInfo()
+```
