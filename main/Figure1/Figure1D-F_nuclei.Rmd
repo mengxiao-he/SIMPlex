@@ -18,7 +18,6 @@ suppressMessages(require(Matrix))
 suppressMessages(require(tidyverse))
 suppressMessages(require(patchwork))
 suppressMessages(require(ggplot2))
-suppressMessages(require(harmony))
 suppressMessages(require(DoubletFinder))
 suppressMessages(require(scCustomize))
 ```
