@@ -19,6 +19,7 @@ suppressMessages(require(tidyverse))
 suppressMessages(require(patchwork))
 suppressMessages(require(ggplot2))
 suppressMessages(require(DoubletFinder))
+suppressMessages(require(scCustomize))
 ```
 
 ## Load cellbender data
