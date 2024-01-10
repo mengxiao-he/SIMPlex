@@ -106,8 +106,6 @@ rm(snMB.filt)
 
 ```{r pre-proc, echo=FALSE, message=FALSE, warning='hide', results='hide'}
 snMB.filt_singlet <- SCTransform(snMB.filt_singlet, vst.flavor="v2", verbose = FALSE)
-all.genes <- rownames(snMB.filt_singlet)
-snMB.filt_singlet <- ScaleData(snMB.filt_singlet, features = all.genes, verbose = FALSE)
 snMB.filt_singlet <- RunPCA(snMB.filt_singlet, features = VariableFeatures(object = snMB.filt_singlet), verbose = FALSE)
 ElbowPlot(snMB.filt_singlet, reduction = "pca", ndims = 50)
 ```
@@ -132,8 +130,6 @@ mb_sc_ref <- subset(mb_sc_ref, idents = c("MBv", "Thal", "Pons", "Medulla", "SSc
 
 # perform standard pre-processing on each object
 mb_sc_ref <- SCTransform(mb_sc_ref, vst.flavor="v2", verbose = FALSE)
-all.genes <- rownames(mb_sc_ref)
-mb_sc_ref <- ScaleData(mb_sc_ref, features = all.genes, verbose = FALSE)
 mb_sc_ref <- RunPCA(mb_sc_ref, verbose = FALSE)
 mb_sc_ref <- RunUMAP(mb_sc_ref, dims = 1:30, verbose = FALSE)
 ```
@@ -176,8 +172,6 @@ se.allen <- readRDS("public_mb_data/allen_cortex.rds")
 
 # perform standard preprocessing on each object
 se.allen <- SCTransform(se.allen, vst.flavor="v2", verbose = FALSE)
-all.genes <- rownames(se.allen)
-se.allen <- ScaleData(se.allen, features = all.genes, verbose = FALSE)
 se.allen <- RunPCA(se.allen, verbose = FALSE)
 se.allen <- RunUMAP(se.allen, dims = 1:30, verbose = FALSE)
 
