@@ -1,0 +1,265 @@
+---
+title: "FFPE Breast Cancer joint analysis"
+output: html_document
+date: "2024-01-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r package, message='hide',warning='hide',results='hold'}
+suppressMessages(require(Seurat))
+suppressMessages(require(Matrix))
+suppressMessages(require(tidyverse))
+suppressMessages(require(patchwork))
+suppressMessages(require(ggplot2))
+suppressMessages(require(harmony))
+suppressMessages(require(scCustomize))
+```
+
+## Load patient data and merge
+
+```{r loaddata,message='hide',warning='hide',results='hold'}
+# Load FFPE BC samples
+FFPE_BC_A <- readRDS(file = "/home/st-analysis_home/mengxiao.he/SIMPlex/analysis/SIMPlex_BC/FFPE/snBC_FFPE_A_cellbender_manual_annot.rds")
+FFPE_BC_B <- readRDS(file = "/home/st-analysis_home/mengxiao.he/SIMPlex/analysis/SIMPlex_BC/FFPE/snBC_FFPE_B_cellbender_manual_annot.rds")
+```
+
+## New grouped labels for better visuals on merged UMAP
+
+```{r group_labels}
+#Grouped annotation labels
+Idents(FFPE_BC_A) <- FFPE_BC_A$manual_annot_0.8
+Idents(FFPE_BC_B) <- FFPE_BC_B$manual_annot_0.8
+
+FFPE_BC_A <- RenameIdents(FFPE_BC_A,
+                          "Cancer epithelial 1" = "Cancer epithelial",
+                          "Cancer epithelial 2" = "Cancer epithelial",
+                          "Cancer epithelial 3" = "Cancer epithelial",
+                          "Cancer epithelial 4" = "Cancer epithelial",
+                          "Cancer epithelial 5" = "Cancer epithelial",
+                          "CAF 1" = "CAF",
+                          "CAF 2" = "CAF",
+                          "T cells" = "T cells",
+                          "Myoepithelial cells" = "Myoepithelial cells",
+                          "Luminal epithelial cells" = "Luminal epithelial cells",
+                          "TAM" = "TAM",
+                          "Endothelial cells" = "Endothelial cells",
+                          "B cells" = "B cells",
+                          "Stroma" = "Stroma",
+                          "Fibroblasts" = "Fibroblasts")
+
+FFPE_BC_B <- RenameIdents(FFPE_BC_B,
+                          "Cancer epithelial 1" = "Cancer epithelial",
+                          "Cancer epithelial 2" = "Cancer epithelial",
+                          "Cancer epithelial 3" = "Cancer epithelial",
+                          "Cancer epithelial 4" = "Cancer epithelial",
+                          "TAM" = "TAM",
+                          "Luminal epithelial cells" = "Luminal epithelial cells",
+                          "CAF" = "CAF",
+                          "Cancer epithelial 5" = "Cancer epithelial",
+                          "Pericytes" = "Pericytes",
+                          "T cells" = "T cells",
+                          "Endothelial cells" = "Endothelial cells",
+                          "Smooth muscle cells" = "Smooth muscle cells",
+                          "Basal epithelial cells" = "Basal epithelial cells",
+                          "Cancer epithelial 6" = "Cancer epithelial",
+                          "B cells" = "B cells")
+
+Idents(FFPE_BC_A) <- FFPE_BC_A@active.ident
+Idents(FFPE_BC_B) <- FFPE_BC_B@active.ident
+FFPE_BC_A$grouped_annot <- Idents(FFPE_BC_A)
+FFPE_BC_B$grouped_annot <- Idents(FFPE_BC_B)
+
+#Patient grouped annotation labels
+Idents(FFPE_BC_A) <- FFPE_BC_A$manual_annot_0.8
+Idents(FFPE_BC_B) <- FFPE_BC_B$manual_annot_0.8
+
+FFPE_BC_A <- RenameIdents(FFPE_BC_A,
+                          "Cancer epithelial 1" = "Patient A - Cancer epithelial",
+                          "Cancer epithelial 2" = "Patient A - Cancer epithelial",
+                          "Cancer epithelial 3" = "Patient A - Cancer epithelial",
+                          "Cancer epithelial 4" = "Patient A - Cancer epithelial",
+                          "Cancer epithelial 5" = "Patient A - Cancer epithelial",
+                          "CAF 1" = "Patient A - CAF",
+                          "CAF 2" = "Patient A - CAF",
+                          "T cells" = "Patient A - T cells",
+                          "Myoepithelial cells" = "Patient A - Myoepithelial cells",
+                          "Luminal epithelial cells" = "Patient A - Luminal epithelial cells",
+                          "TAM" = "Patient A - TAM",
+                          "Endothelial cells" = "Patient A - Endothelial cells",
+                          "B cells" = "Patient A - B cells",
+                          "Stroma" = "Patient A - Stroma",
+                          "Fibroblasts" = "Patient A - Fibroblasts")
+
+FFPE_BC_B <- RenameIdents(FFPE_BC_B,
+                          "Cancer epithelial 1" = "Patient B - Cancer epithelial",
+                          "Cancer epithelial 2" = "Patient B - Cancer epithelial",
+                          "Cancer epithelial 3" = "Patient B - Cancer epithelial",
+                          "Cancer epithelial 4" = "Patient B - Cancer epithelial",
+                          "TAM" = "Patient B - TAM",
+                          "Luminal epithelial cells" = "Patient B - Luminal epithelial cells",
+                          "CAF" = "Patient B - CAF",
+                          "Cancer epithelial 5" = "Patient B - Cancer epithelial",
+                          "Pericytes" = "Patient B - Pericytes",
+                          "T cells" = "Patient B - T cells",
+                          "Endothelial cells" = "Patient B - Endothelial cells",
+                          "Smooth muscle cells" = "Patient B - Smooth muscle cells",
+                          "Basal epithelial cells" = "Patient B - Basal epithelial cells",
+                          "Cancer epithelial 6" = "Patient B - Cancer epithelial",
+                          "B cells" = "Patient B - B cells")
+
+Idents(FFPE_BC_A) <- FFPE_BC_A@active.ident
+Idents(FFPE_BC_B) <- FFPE_BC_B@active.ident
+FFPE_BC_A$pat_group_annot <- Idents(FFPE_BC_A)
+FFPE_BC_B$pat_group_annot <- Idents(FFPE_BC_B)
+
+#Add patient to annotation labels
+Idents(FFPE_BC_A) <- FFPE_BC_A$manual_annot_0.8
+Idents(FFPE_BC_B) <- FFPE_BC_B$manual_annot_0.8
+
+FFPE_BC_A <- RenameIdents(FFPE_BC_A,
+                          "Cancer epithelial 1" = "Patient A - Cancer epithelial 1",
+                          "Cancer epithelial 2" = "Patient A - Cancer epithelial 2",
+                          "Cancer epithelial 3" = "Patient A - Cancer epithelial 3",
+                          "Cancer epithelial 4" = "Patient A - Cancer epithelial 4",
+                          "Cancer epithelial 5" = "Patient A - Cancer epithelial 5",
+                          "CAF 1" = "Patient A - CAF 1",
+                          "CAF 2" = "Patient A - CAF 2",
+                          "T cells" = "Patient A - T cells",
+                          "Myoepithelial cells" = "Patient A - Myoepithelial cells",
+                          "Luminal epithelial cells" = "Patient A - Luminal epithelial cells",
+                          "TAM" = "Patient A - TAM",
+                          "Endothelial cells" = "Patient A - Endothelial cells",
+                          "B cells" = "Patient A - B cells",
+                          "Stroma" = "Patient A - Stroma",
+                          "Fibroblasts" = "Patient A - Fibroblasts")
+
+FFPE_BC_B <- RenameIdents(FFPE_BC_B,
+                          "Cancer epithelial 1" = "Patient B - Cancer epithelial 1",
+                          "Cancer epithelial 2" = "Patient B - Cancer epithelial 2",
+                          "Cancer epithelial 3" = "Patient B - Cancer epithelial 3",
+                          "Cancer epithelial 4" = "Patient B - Cancer epithelial 4",
+                          "TAM" = "Patient B - TAM",
+                          "Luminal epithelial cells" = "Patient B - Luminal epithelial cells",
+                          "CAF" = "Patient B - CAF",
+                          "Cancer epithelial 5" = "Patient B - Cancer epithelial 5",
+                          "Pericytes" = "Patient B - Pericytes",
+                          "T cells" = "Patient B - T cells",
+                          "Endothelial cells" = "Patient B - Endothelial cells",
+                          "Smooth muscle cells" = "Patient B - Smooth muscle cells",
+                          "Basal epithelial cells" = "Patient B - Basal epithelial cells",
+                          "Cancer epithelial 6" = "Patient B - Cancer epithelial 6",
+                          "B cells" = "Patient B - B cells")
+
+Idents(FFPE_BC_A) <- FFPE_BC_A@active.ident
+Idents(FFPE_BC_B) <- FFPE_BC_B@active.ident
+FFPE_BC_A$pat_lab_annot <- Idents(FFPE_BC_A)
+FFPE_BC_B$pat_lab_annot <- Idents(FFPE_BC_B)
+```
+
+
+## Merge seurat object
+
+```{r merge}
+FFPE_BC_merged <- merge(FFPE_BC_A, FFPE_BC_B, add.cell.ids = c("FFPE_BC_A", "FFPE_BC_B"), project = "SIMPlex_FFPE")
+```
+
+
+## Grab highly variable features and run PCA
+
+```{r pre-proc, echo=FALSE, message=FALSE, warning='hide', results='hide'}
+FFPE_BC_merged <- SCTransform(FFPE_BC_merged, vst.flavor="v2", verbose = FALSE)
+FFPE_BC_merged <- RunPCA(FFPE_BC_merged, verbose = FALSE)
+```
+
+## Harmony and umap
+
+```{r harmony_umap, warning=FALSE}
+FFPE_BC_merged <- RunHarmony(FFPE_BC_merged,
+                             group.by.vars = c("sample"), dims.use = 1:30,
+                             assay.use = "SCT", reduction.save = "harmony", verbose = F)
+FFPE_BC_merged <- RunUMAP(FFPE_BC_merged, dims = 1:30, reduction = "harmony", reduction.name = "umap_harmony", verbose = FALSE)
+```
+
+## UMAP Harmony
+
+```{r harmony_plots, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+p1 <- DimPlot(FFPE_BC_merged, reduction = 'umap_harmony', group.by = "sample") + 
+  ggtitle(label = "UMAP Harmony FFPE snRNA", subtitle = "By patient")
+p2 <- DimPlot(FFPE_BC_merged, reduction = 'umap_harmony', group.by = "grouped_annot") + 
+  ggtitle(label = "UMAP Harmony FFPE snRNA", subtitle = "By grouped annotation")
+p2 <- LabelClusters(p2, id = "grouped_annot",  fontface = "bold", repel = TRUE)
+p3 <- DimPlot(FFPE_BC_merged, reduction = 'umap_harmony', group.by = "pat_lab_annot") + 
+  ggtitle(label = "UMAP Harmony FFPE snRNA", subtitle = "By patient labeled annotation")
+p4 <- DimPlot(FFPE_BC_merged, reduction = 'umap_harmony', group.by = "pat_group_annot") + 
+  ggtitle(label = "UMAP Harmony FFPE snRNA", subtitle = "By grouped patient labeled annotation")
+p4 <- LabelClusters(p4, id = "pat_group_annot",  fontface = "bold", repel = TRUE)
+```
+
+## Highlight plot
+```{r highlight_plot}
+Idents(FFPE_BC_merged) <- FFPE_BC_merged$pat_lab_annot
+#Cancer epi
+cancer_epi_A1 <- WhichCells(FFPE_BC_merged, idents = c("Patient A - Cancer epithelial 1"))
+cancer_epi_A2 <- WhichCells(FFPE_BC_merged, idents = c("Patient A - Cancer epithelial 2"))
+cancer_epi_A3 <- WhichCells(FFPE_BC_merged, idents = c("Patient A - Cancer epithelial 3"))
+cancer_epi_A4 <- WhichCells(FFPE_BC_merged, idents = c("Patient A - Cancer epithelial 4"))
+cancer_epi_A5 <- WhichCells(FFPE_BC_merged, idents = c("Patient A - Cancer epithelial 5"))
+cancer_epi_B1 <- WhichCells(FFPE_BC_merged, idents = c("Patient B - Cancer epithelial 1"))
+cancer_epi_B2 <- WhichCells(FFPE_BC_merged, idents = c("Patient B - Cancer epithelial 2"))
+cancer_epi_B3 <- WhichCells(FFPE_BC_merged, idents = c("Patient B - Cancer epithelial 3"))
+cancer_epi_B4 <- WhichCells(FFPE_BC_merged, idents = c("Patient B - Cancer epithelial 4"))
+cancer_epi_B5 <- WhichCells(FFPE_BC_merged, idents = c("Patient B - Cancer epithelial 5"))
+cancer_epi_B6 <- WhichCells(FFPE_BC_merged, idents = c("Patient B - Cancer epithelial 6"))
+
+
+cells.cancer.epi <- list("Patient A - Cancer epithelial 1" = cancer_epi_A1,
+                         "Patient A - Cancer epithelial 2" = cancer_epi_A2,
+                         "Patient A - Cancer epithelial 3" = cancer_epi_A3,
+                         "Patient A - Cancer epithelial 4" = cancer_epi_A4,
+                         "Patient A - Cancer epithelial 5" = cancer_epi_A5,
+                         "Patient B - Cancer epithelial 1" = cancer_epi_B1,
+                         "Patient B - Cancer epithelial 2" = cancer_epi_B2,
+                         "Patient B - Cancer epithelial 3" = cancer_epi_B3,
+                         "Patient B - Cancer epithelial 4" = cancer_epi_B4,
+                         "Patient B - Cancer epithelial 5" = cancer_epi_B5,
+                         "Patient B - Cancer epithelial 6" = cancer_epi_B6)
+
+h1 <- Cell_Highlight_Plot(seurat_object = FFPE_BC_merged, cells_highlight = cells.cancer.epi, 
+                    highlight_color = c("#332288", "#6699CC", "#88CCEE", "#44AA99", "#117733", "#999933", "#DDCC77", "#661100", "#CC6677", "#882255", "#AA4499"))
+
+#CAFs
+caf_A1 <- WhichCells(FFPE_BC_merged, idents = c("Patient A - CAF 1"))
+caf_A2 <- WhichCells(FFPE_BC_merged, idents = c("Patient A - CAF 2"))
+caf_B <- WhichCells(FFPE_BC_merged, idents = c("Patient B - CAF"))
+
+cells.caf <- list("Patient A - CAF 1" = caf_A1,
+                  "Patient A - CAF 2" = caf_A2,
+                  "Patient B - CAF" = caf_B)
+
+h2 <- Cell_Highlight_Plot(seurat_object = FFPE_BC_merged, cells_highlight = cells.caf, 
+                    highlight_color = c("#4477AA", "#117733", "#CC6677"))
+```
+
+## Patchwork plot
+
+```{r}
+umap_multi_plot <- p1 + p2 + h1 + h2 + plot_layout(ncol = 2)
+ggsave(filename="umap_multi_merge.pdf", 
+       plot = umap_multi_plot,
+       device = cairo_pdf, 
+       width = 18, 
+       height = 16, 
+       units = "in")
+```
+
+
+## Session Info
+
+```{r session_info}
+sessionInfo()
+```

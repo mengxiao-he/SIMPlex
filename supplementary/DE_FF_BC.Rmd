@@ -1,0 +1,118 @@
+---
+title: "DE analysis BC FF"
+output: html_document
+date: "2024-01-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r libraries}
+suppressMessages(require(Seurat))
+suppressMessages(require(tidyverse))
+suppressMessages(require(gprofiler2))
+suppressMessages(require(enrichplot))
+```
+
+## Load data
+
+```{r load_data}
+snBC <- readRDS(file = "/home/st-analysis_home/mengxiao.he/SIMPlex/analysis/230619_BC_reseq/cellbender_out/snBC_1_cellbender_manual_annot_cleaned.rds")
+```
+
+## DE genes between two cancer clusters
+
+```{r markers_3_9, warning=FALSE}
+# find all markers distinguishing Cancer epithelial 3 from cancer epithelial 5
+cluster.markers.all <- FindMarkers(snBC, 
+                                   ident.1 = "Cancer epithelial 3", ident.2 = "Cancer epithelial 5", 
+                                   min.pct = 0, logfc.threshold = -Inf,
+                                   verbose = FALSE)
+
+EnhancedVolcano(cluster.markers.all, 
+                x = "avg_log2FC", y = "p_val_adj", 
+                lab = rownames(cluster.markers.all), 
+                title = "FF BC Differential Expression",
+                subtitle = "Cancer epithelial 3 versus Cancer epithelial 5",
+                FCcutoff = 0.5, pCutoff = 0.01,
+                pointSize = 4, labSize = 4.5)
+```
+
+## Functional enrichment analysis
+
+```{r fea}
+cluster.markers.3 <- FindMarkers(snBC,
+                                 ident.1 = "Cancer epithelial 3", ident.2 = "Cancer epithelial 5",
+                                 logfc.threshold = 0.25, only.pos = TRUE,
+                                 verbose = FALSE)
+cluster.markers.5 <- FindMarkers(snBC,
+                                 ident.1 = "Cancer epithelial 5", ident.2 = "Cancer epithelial 3",
+                                 logfc.threshold = 0.25, only.pos = TRUE,
+                                 verbose = FALSE)
+
+cluster.markers.3$gene <- rownames(cluster.markers.3)
+cluster.markers.5$gene <- rownames(cluster.markers.5)
+
+cluster.markers.3.genes <- cluster.markers.3 %>%
+  filter(p_val_adj < 0.01, avg_log2FC > 0.5) %>%
+  pull(gene)
+cluster.markers.5.genes <- cluster.markers.5 %>%
+  filter(p_val_adj < 0.01, avg_log2FC > 0.5) %>%
+  pull(gene)
+
+fea.3 <- gost(query = cluster.markers.3.genes, 
+            organism = "hsapiens", 
+            significant = TRUE, 
+            evcodes = TRUE, 
+            sources = "GO:BP")
+fea.5 <- gost(query = cluster.markers.5.genes, 
+            organism = "hsapiens", 
+            significant = TRUE, 
+            evcodes = TRUE, 
+            sources = "GO:BP")
+
+fea.3_mod = fea.3$result[,c("query", "source", "term_id",
+                                "term_name", "p_value", "query_size", 
+                                "intersection_size", "term_size", 
+                                "effective_domain_size", "intersection")]
+fea.3_mod$GeneRatio = paste0(fea.3_mod$intersection_size,  "/", fea.3_mod$query_size)
+fea.3_mod$BgRatio = paste0(fea.3_mod$term_size, "/", fea.3_mod$effective_domain_size)
+names(fea.3_mod) = c("Cluster", "Category", "ID", "Description", "p.adjust", 
+                    "query_size", "Count", "term_size", "effective_domain_size", 
+                    "geneID", "GeneRatio", "BgRatio")
+fea.3_mod$geneID = gsub(",", "/", fea.3_mod$geneID)
+row.names(fea.3_mod) = fea.3_mod$ID
+fea.3_mod_enrich  = new("enrichResult", result = fea.3_mod)
+
+fea.5_mod = fea.5$result[,c("query", "source", "term_id",
+                                "term_name", "p_value", "query_size", 
+                                "intersection_size", "term_size", 
+                                "effective_domain_size", "intersection")]
+fea.5_mod$GeneRatio = paste0(fea.5_mod$intersection_size,  "/", fea.5_mod$query_size)
+fea.5_mod$BgRatio = paste0(fea.5_mod$term_size, "/", fea.5_mod$effective_domain_size)
+names(fea.5_mod) = c("Cluster", "Category", "ID", "Description", "p.adjust", 
+                    "query_size", "Count", "term_size", "effective_domain_size", 
+                    "geneID", "GeneRatio", "BgRatio")
+fea.5_mod$geneID = gsub(",", "/", fea.5_mod$geneID)
+row.names(fea.5_mod) = fea.5_mod$ID
+fea.5_mod_enrich  = new("enrichResult", result = fea.5_mod)
+
+barplot(fea.3_mod_enrich, showCategory = 40, font.size = 10) + 
+  aes(y = reorder(Description, Count)) +
+  ggplot2::xlab("Genes") + 
+  ggplot2::ylab("") + 
+  ggplot2::ggtitle("Cancer Epithelial 3")
+barplot(fea.5_mod_enrich, showCategory = 40, font.size = 10) + 
+  aes(y = reorder(Description, Count)) +
+  ggplot2::xlab("Genes") + 
+  ggplot2::ylab("") + 
+  ggplot2::ggtitle("Cancer Epithelial 5")
+```
+
+## Session info
+```{r session_info}
+sessionInfo()
+```
