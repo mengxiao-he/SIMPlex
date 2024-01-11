@@ -74,49 +74,6 @@ Idents(FFPE_BC_B) <- FFPE_BC_B@active.ident
 FFPE_BC_A$grouped_annot <- Idents(FFPE_BC_A)
 FFPE_BC_B$grouped_annot <- Idents(FFPE_BC_B)
 
-#Patient grouped annotation labels
-Idents(FFPE_BC_A) <- FFPE_BC_A$manual_annot_0.8
-Idents(FFPE_BC_B) <- FFPE_BC_B$manual_annot_0.8
-
-FFPE_BC_A <- RenameIdents(FFPE_BC_A,
-                          "Cancer epithelial 1" = "Patient A - Cancer epithelial",
-                          "Cancer epithelial 2" = "Patient A - Cancer epithelial",
-                          "Cancer epithelial 3" = "Patient A - Cancer epithelial",
-                          "Cancer epithelial 4" = "Patient A - Cancer epithelial",
-                          "Cancer epithelial 5" = "Patient A - Cancer epithelial",
-                          "CAF 1" = "Patient A - CAF",
-                          "CAF 2" = "Patient A - CAF",
-                          "T cells" = "Patient A - T cells",
-                          "Myoepithelial cells" = "Patient A - Myoepithelial cells",
-                          "Luminal epithelial cells" = "Patient A - Luminal epithelial cells",
-                          "TAM" = "Patient A - TAM",
-                          "Endothelial cells" = "Patient A - Endothelial cells",
-                          "B cells" = "Patient A - B cells",
-                          "Stroma" = "Patient A - Stroma",
-                          "Fibroblasts" = "Patient A - Fibroblasts")
-
-FFPE_BC_B <- RenameIdents(FFPE_BC_B,
-                          "Cancer epithelial 1" = "Patient B - Cancer epithelial",
-                          "Cancer epithelial 2" = "Patient B - Cancer epithelial",
-                          "Cancer epithelial 3" = "Patient B - Cancer epithelial",
-                          "Cancer epithelial 4" = "Patient B - Cancer epithelial",
-                          "TAM" = "Patient B - TAM",
-                          "Luminal epithelial cells" = "Patient B - Luminal epithelial cells",
-                          "CAF" = "Patient B - CAF",
-                          "Cancer epithelial 5" = "Patient B - Cancer epithelial",
-                          "Pericytes" = "Patient B - Pericytes",
-                          "T cells" = "Patient B - T cells",
-                          "Endothelial cells" = "Patient B - Endothelial cells",
-                          "Smooth muscle cells" = "Patient B - Smooth muscle cells",
-                          "Basal epithelial cells" = "Patient B - Basal epithelial cells",
-                          "Cancer epithelial 6" = "Patient B - Cancer epithelial",
-                          "B cells" = "Patient B - B cells")
-
-Idents(FFPE_BC_A) <- FFPE_BC_A@active.ident
-Idents(FFPE_BC_B) <- FFPE_BC_B@active.ident
-FFPE_BC_A$pat_group_annot <- Idents(FFPE_BC_A)
-FFPE_BC_B$pat_group_annot <- Idents(FFPE_BC_B)
-
 #Add patient to annotation labels
 Idents(FFPE_BC_A) <- FFPE_BC_A$manual_annot_0.8
 Idents(FFPE_BC_B) <- FFPE_BC_B$manual_annot_0.8
@@ -169,7 +126,7 @@ FFPE_BC_merged <- merge(FFPE_BC_A, FFPE_BC_B, add.cell.ids = c("FFPE_BC_A", "FFP
 ```
 
 
-## Grab highly variable features and run PCA
+## SCTransform and PCA
 
 ```{r pre-proc, echo=FALSE, message=FALSE, warning='hide', results='hide'}
 FFPE_BC_merged <- SCTransform(FFPE_BC_merged, vst.flavor="v2", verbose = FALSE)
@@ -193,11 +150,6 @@ p1 <- DimPlot(FFPE_BC_merged, reduction = 'umap_harmony', group.by = "sample") +
 p2 <- DimPlot(FFPE_BC_merged, reduction = 'umap_harmony', group.by = "grouped_annot") + 
   ggtitle(label = "UMAP Harmony FFPE snRNA", subtitle = "By grouped annotation")
 p2 <- LabelClusters(p2, id = "grouped_annot",  fontface = "bold", repel = TRUE)
-p3 <- DimPlot(FFPE_BC_merged, reduction = 'umap_harmony', group.by = "pat_lab_annot") + 
-  ggtitle(label = "UMAP Harmony FFPE snRNA", subtitle = "By patient labeled annotation")
-p4 <- DimPlot(FFPE_BC_merged, reduction = 'umap_harmony', group.by = "pat_group_annot") + 
-  ggtitle(label = "UMAP Harmony FFPE snRNA", subtitle = "By grouped patient labeled annotation")
-p4 <- LabelClusters(p4, id = "pat_group_annot",  fontface = "bold", repel = TRUE)
 ```
 
 ## Highlight plot
