@@ -1,0 +1,252 @@
+---
+title: "SIMPlex BC Cell Bender"
+output: html_document
+date: "2024-01-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and data
+
+Load libraries
+
+```{r package, message='hide',warning='hide',results='hold'}
+suppressMessages(require(Seurat))
+suppressMessages(require(Matrix))
+suppressMessages(require(tidyverse))
+suppressMessages(require(patchwork))
+suppressMessages(require(ggplot2))
+suppressMessages(require(ggpubr))
+suppressMessages(require(harmony))
+suppressMessages(require(DoubletFinder))
+suppressMessages(require(scCustomize))
+```
+
+## Load cellbender data
+
+```{r loaddata}
+# Load BC samples
+BC_1.1_cellbender <- Read_CellBender_h5_Mat(file_name = "FF/sample_1.1_cellbender_output_filtered.h5", use.names = TRUE, )
+BC_1.1 <- suppressWarnings(CreateSeuratObject(BC_1.1_cellbender,  project = "SIMPlex_BC"))
+BC_1.1$sample <- "BC_1.1"
+
+BC_1.2_cellbender <- Read_CellBender_h5_Mat(file_name = "FF/sample_1.2_cellbender_output_filtered.h5", use.names = TRUE)
+BC_1.2 <- suppressWarnings(CreateSeuratObject(BC_1.2_cellbender,  project = "SIMPlex_BC"))
+BC_1.2$sample <- "BC_1.2"
+
+rm(BC_1.1_cellbender, BC_1.2_cellbender)
+```
+
+## Filter based on 10x CellRanger gene filtering
+
+```{r filtering}
+BC_1.1_cellranger <- Seurat::Read10X_h5(
+  filename = "FF/sample_1.1/sample_filtered_feature_bc_matrix.h5",
+  use.names = T)
+BC_1.1_cellranger <- CreateSeuratObject(BC_1.1_cellranger,  project = "SIMPlex_BC")
+BC_1.1_cellranger$sample <- "BC1.1"
+
+BC_1.2_cellranger <- Seurat::Read10X_h5(
+  filename = "FF/sample_1.2/sample_filtered_feature_bc_matrix.h5",
+  use.names = T)
+BC_1.2_cellranger <- CreateSeuratObject(BC_1.2_cellranger,  project = "SIMPlex_BC")
+BC_1.2_cellranger$sample <- "BC1.2"
+
+BC_1.1_features <- rownames(BC_1.1_cellranger)
+BC_1.1 <- subset(BC_1.1, features=BC_1.1_features)
+
+BC_1.2_features <- rownames(BC_1.2_cellranger)
+BC_1.2 <- subset(BC_1.2, features=BC_1.2_features)
+
+rm(BC_1.1_cellranger, BC_1.2_cellranger)
+rm(BC_1.1_features, BC_1.2_features)
+```
+
+## Filtering (number of cells removed)
+
+```{r qc_filtering}
+selected_c <- WhichCells(BC_1.1, expression = nFeature_RNA > 250)
+selected_f <- rownames(BC_1.1)[ Matrix::rowSums(BC_1.1) > 3]
+BC_1.1.filt <- subset(BC_1.1, features=selected_f, cells=selected_c)
+
+selected_c <- WhichCells(BC_1.2, expression = nFeature_RNA > 250)
+selected_f <- rownames(BC_1.2)[ Matrix::rowSums(BC_1.2) > 3]
+BC_1.2.filt <- subset(BC_1.2, features=selected_f, cells=selected_c)
+
+length(colnames(BC_1.1)) - length(colnames(BC_1.1.filt))
+length(colnames(BC_1.2)) - length(colnames(BC_1.2.filt))
+rm(BC_1.1, BC_1.2)
+```
+
+## Normalize
+
+```{r norm}
+BC_1.1.filt <- SCTransform(BC_1.1.filt, vst.flavor="v2", verbose = FALSE)
+BC_1.2.filt <- SCTransform(BC_1.2.filt, vst.flavor="v2", verbose = FALSE)
+```
+
+## PCA
+
+```{r pca}
+BC_1.1.filt <- RunPCA(BC_1.1.filt, features = VariableFeatures(object = BC_1.1.filt), verbose = FALSE)
+BC_1.2.filt <- RunPCA(BC_1.2.filt, features = VariableFeatures(object = BC_1.2.filt), verbose = FALSE)
+```
+
+## Dimensionality check
+
+```{r elbow_plot_1}
+p1 <- ElbowPlot(BC_1.1.filt, reduction = "pca", ndims = 50)
+p2 <- ElbowPlot(BC_1.2.filt, reduction = "pca", ndims = 50)
+
+p1 - p2
+```
+
+## UMAP
+
+```{r umap}
+BC_1.1.filt <- RunUMAP(BC_1.1.filt, dims = 1:40, verbose = FALSE)
+BC_1.2.filt <- RunUMAP(BC_1.2.filt, dims = 1:40, verbose = FALSE)
+
+p1 <- DimPlot(BC_1.1.filt, reduction = 'umap', label = FALSE) + ggtitle("BC 1_1")
+p2 <- DimPlot(BC_1.2.filt, reduction = 'umap', label = FALSE) + ggtitle("BC 1_2")
+p1 - p2
+```
+
+## Predict dublets
+
+```{r doubletfinder}
+# Run parameter optimization with paramSweep
+sweep.res <- paramSweep_v3(BC_1.1.filt, PCs = 1:40, sct = TRUE)
+sweep.stats <- summarizeSweep(sweep.res, GT = FALSE)
+bcmvn <- find.pK(sweep.stats)
+barplot(bcmvn$BCmetric, names.arg = bcmvn$pK, las=2)
+BC_1.1_pK <- bcmvn$pK[which.max(bcmvn$BCmetric)]
+
+sweep.res <- paramSweep_v3(BC_1.2.filt, PCs = 1:40, sct = TRUE)
+sweep.stats <- summarizeSweep(sweep.res, GT = FALSE)
+bcmvn <- find.pK(sweep.stats)
+barplot(bcmvn$BCmetric, names.arg = bcmvn$pK, las=2)
+BC_1.2_pK <- bcmvn$pK[which.max(bcmvn$BCmetric)]
+
+# define the expected number of doublet cellscells.
+nExp <- round(ncol(BC_1.1.filt)* 0.08) # expect 8% doublets
+BC_1.1.filt <- doubletFinder_v3(BC_1.1.filt, pN=0.25, pK = BC_1.1_pK, nExp = nExp, PCs = 1:40, sct = TRUE)
+nExp <- round(ncol(BC_1.2.filt)* 0.08)
+BC_1.2.filt <- doubletFinder_v3(BC_1.2.filt, pN=0.25, pK = BC_1.2_pK, nExp = nExp, PCs = 1:40, sct = TRUE)
+```
+
+## Plot DF classifications UMAP
+
+```{r DP.find}
+DF.name.1 = colnames(BC_1.1.filt@meta.data)[grepl("DF.classification", colnames(BC_1.1.filt@meta.data))]
+p1 <- DimPlot(BC_1.1.filt, group.by = DF.name.1) + NoAxes() + ggtitle("BC 1.1")
+DF.name.2 = colnames(BC_1.2.filt@meta.data)[grepl("DF.classification", colnames(BC_1.2.filt@meta.data))]
+p2 <- DimPlot(BC_1.2.filt, group.by = DF.name.2) + NoAxes() + ggtitle("BC 1.2")
+
+p1 - p2
+```
+
+## Doublet removal
+
+```{r filter.doublets}
+#Filter data
+BC_1.1.filt = BC_1.1.filt[,BC_1.1.filt@meta.data[,DF.name.1] == "Singlet"]
+BC_1.2.filt = BC_1.2.filt[,BC_1.2.filt@meta.data[,DF.name.2] == "Singlet"]
+```
+
+# Merge
+
+```{r merge}
+snBC <- merge(BC_1.1.filt, BC_1.2.filt, add.cell.ids = c("BC_1.1", "BC_1.2"), project = "SIMPlex_BC")
+rm(BC_1.1.filt, BC_1.2.filt)
+```
+
+## Normalize, highly variable features, scaling and PCA
+
+```{r pre-proc}
+snBC <- SCTransform(snBC, vst.flavor="v2", verbose = FALSE)
+all.genes <- rownames(snBC)
+snBC <- ScaleData(snBC, features = all.genes, verbose = FALSE)
+snBC <- RunPCA(snBC, features = VariableFeatures(object = snBC), verbose = FALSE)
+```
+
+## Dimensionality check
+
+```{r elbow_plot_2}
+ElbowPlot(snBC, reduction = "pca", ndims = 50)
+```
+
+## UMAP
+
+```{r umap_sample}
+snBC <- RunUMAP(snBC, dims = 1:30, verbose = FALSE)
+
+DimPlot(snBC, reduction = 'umap', group.by = "sample", label = FALSE) + ggtitle("BC SIMPlex")
+```
+
+## Find neighbours & Cluster
+
+```{r neightbours_cluster}
+snBC <- FindNeighbors(snBC, dims = 1:30, verbose = FALSE)
+# Clustering with louvain (algorithm 1)
+for (res in c(0.1, 0.25, .5, 0.8, 1, 1.25)){
+  snBC <- FindClusters(snBC, resolution = res , algorithm = 1, verbose = FALSE)
+}
+
+d1 <- DimPlot(snBC, reduction = "umap", group.by = "SCT_snn_res.0.1", label = TRUE) + DimPlot(snBC, reduction = "umap", group.by = "SCT_snn_res.0.25", label = TRUE) + DimPlot(snBC, reduction = "umap", group.by = "SCT_snn_res.0.5", label = TRUE)
+d2 <- DimPlot(snBC, reduction = "umap", group.by = "SCT_snn_res.0.8", label = TRUE) + DimPlot(snBC, reduction = "umap", group.by = "SCT_snn_res.1", label = TRUE) + DimPlot(snBC, reduction = "umap", group.by = "SCT_snn_res.1.25", label = TRUE)
+
+d1 / d2
+```
+
+## Cluster markers
+
+```{r markers}
+snBC <- FindClusters(snBC, resolution = 0.5, algorithm = 1, verbose = FALSE)
+markers_0.5 <- FindAllMarkers(snBC, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25, verbose = FALSE)
+markers_0.5_30 <- markers_0.5 %>% filter(p_val_adj < 0.01) %>% group_by(cluster) %>% slice_max(n = 30, order_by = avg_log2FC)
+write.csv(markers_0.5, "FF_BC/top30_markers_0.5.csv", row.names = FALSE)
+```
+
+## Annotated cluster UMAP
+
+```{r clusterdotplot}
+Idents(snBC) <- snBC$SCT_snn_res.0.5
+snBC <- RenameIdents(snBC,
+                     "0" = "Cancer epithelial 1",
+                     "1" = "Cancer epithelial 2",
+                     "2" = "CAF 1",
+                     "3" = "Cancer epithelial 3",
+                     "4" = "TAM 1",
+                     "5" = "Cancer epithelial 4",
+                     "6" = "Immune cells/granulocytes",
+                     "7" = "CAF 2",
+                     "8" = "Endothelial cells",
+                     "9" = "Cancer epithelial 5",
+                     "10" = "Cancer proliferative",
+                     "11" = "Vascular smooth muscle",
+                     "12" = "Luminal epithelial cells",
+                     "13" = "Basal epithelial cells",
+                     "14" = "T cells",
+                     "15" = "TAM 2",
+                     "16" = "Immune cells/interferon-stimulated")
+
+Idents(snBC) <- factor(snBC@active.ident, sort(levels(snBC@active.ident)))
+snBC$manual_annot_0.5 <- Idents(snBC)
+
+DimPlot(snBC, reduction = "umap", group.by = "manual_annot_0.5")
+```
+
+## Save objects
+
+```{r save, warning=FALSE, eval=FALSE}
+saveRDS(snBC, file = "breast_cancer/FF_snRNA.rds")
+```
+
+
+## Session info
+```{r session_info}
+sessionInfo()
+```
