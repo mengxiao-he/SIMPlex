@@ -165,7 +165,7 @@ MapMultipleFeatures(se_filtered_0.5, section_number = 1,
 ## Save objects
 
 ```{r save, warning=FALSE, eval=FALSE}
-saveRDS(se_filtered, file = "SIMPlex_BC_FF/spatial_filtered_NNLS.rds")
+saveRDS(se_filtered_0.5, file = "SIMPlex_BC_FF/spatial_filtered_NNLS.rds")
 ```
 
 ## Session info
