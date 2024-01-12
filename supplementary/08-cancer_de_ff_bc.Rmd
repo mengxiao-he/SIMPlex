@@ -21,7 +21,7 @@ suppressMessages(require(enrichplot))
 ## Load data
 
 ```{r load_data}
-snBC <- readRDS(file = "/home/st-analysis_home/mengxiao.he/SIMPlex/analysis/230619_BC_reseq/cellbender_out/snBC_1_cellbender_manual_annot_cleaned.rds")
+snBC <- readRDS(file = "FF_snRNA.rds")
 ```
 
 ## DE genes between two cancer clusters
