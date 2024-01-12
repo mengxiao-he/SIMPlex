@@ -11,8 +11,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Load libraries
 
-Load libraries
-
 ```{r package, message='hide', results='hold'}
 suppressMessages(require(semla))
 suppressMessages(require(patchwork))
