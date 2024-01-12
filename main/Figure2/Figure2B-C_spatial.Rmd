@@ -18,7 +18,6 @@ suppressMessages(require(semla))
 suppressMessages(require(patchwork))
 suppressMessages(require(RcppML))
 suppressMessages(require(ggplot2))
-suppressMessages(require(ggpubr))
 suppressMessages(require(singlet))
 suppressMessages(require(tidyr))
 ```
