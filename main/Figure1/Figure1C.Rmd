@@ -24,7 +24,7 @@ suppressMessages(require(ggpubr))
 
 ## Load data
 
-```{r loaddata,message='hide',warning='hide',results='hold'}
+```{r loaddata}
 # Load samples
 SIMPlex_snMB.data <- Seurat::Read10X_h5(
   filename = "mouse_brain/sample_filtered_feature_bc_matrix.h5",
@@ -45,7 +45,7 @@ snMB <- merge(MB_SIMPlex, MFB_10x, add.cell.ids = c("MB_SIMPlex", "MFB_10x"), pr
 
 ## Plot QC
 
-```{r qcplot,message='hide',warning='hide', results='hold',results='hold',fig.height=10,fig.width=20}
+```{r qcplot}
 x <- VlnPlot(snMB, features = "nFeature_RNA", pt.size = 0, group.by = "sample") + NoLegend()
 y <- VlnPlot(snMB, features = "nCount_RNA", pt.size = 0, group.by = "sample", y.max = 100000) + NoLegend()
 x | y
@@ -53,7 +53,7 @@ x | y
 
 ## Scatterplot comparison
 
-```{r scatter, fig.height=6, fig.width=8}
+```{r scatter}
 gene_attr <- do.call(rbind, lapply(unique(snMB$sample), function(i) {
   umis <- GetAssayData(snMB, slot = "counts", assay = "RNA")[, snMB$sample %in% i]
   gene_attr <- data.frame(gene = rownames(umis),
