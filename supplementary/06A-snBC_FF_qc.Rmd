@@ -1,0 +1,118 @@
+---
+title: "SIMPlex BC nuclei qc"
+output: html_document
+date: "2024-01-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and data
+
+Load libraries
+
+```{r package, message='hide',warning='hide',results='hold'}
+suppressMessages(require(Seurat))
+suppressMessages(require(Matrix))
+suppressMessages(require(tidyverse))
+suppressMessages(require(patchwork))
+suppressMessages(require(ggplot2))
+suppressMessages(require(ggpubr))
+suppressMessages(require(scCustomize))
+```
+
+## Load cellbender data
+
+```{r loaddata}
+# Load BC samples
+BC_1.1_cellbender <- Read_CellBender_h5_Mat(file_name = "FF/sample_1.1_cellbender_output_filtered.h5", use.names = TRUE, )
+BC_1.1 <- suppressWarnings(CreateSeuratObject(BC_1.1_cellbender,  project = "SIMPlex_BC"))
+BC_1.1$sample <- "BC_1.1"
+
+BC_1.2_cellbender <- Read_CellBender_h5_Mat(file_name = "FF/sample_1.2_cellbender_output_filtered.h5", use.names = TRUE)
+BC_1.2 <- suppressWarnings(CreateSeuratObject(BC_1.2_cellbender,  project = "SIMPlex_BC"))
+BC_1.2$sample <- "BC_1.2"
+
+rm(BC_1.1_cellbender, BC_1.2_cellbender)
+```
+
+## Filter based on 10x CellRanger gene filtering
+
+```{r filtering}
+BC_1.1_cellranger <- Seurat::Read10X_h5(
+  filename = "FF/sample_1.1/sample_filtered_feature_bc_matrix.h5",
+  use.names = T)
+BC_1.1_cellranger <- CreateSeuratObject(BC_1.1_cellranger,  project = "SIMPlex_BC")
+BC_1.1_cellranger$sample <- "BC1.1"
+
+BC_1.2_cellranger <- Seurat::Read10X_h5(
+  filename = "FF/sample_1.2/sample_filtered_feature_bc_matrix.h5",
+  use.names = T)
+BC_1.2_cellranger <- CreateSeuratObject(BC_1.2_cellranger,  project = "SIMPlex_BC")
+BC_1.2_cellranger$sample <- "BC1.2"
+
+BC_1.1_features <- rownames(BC_1.1_cellranger)
+BC_1.1 <- subset(BC_1.1, features=BC_1.1_features)
+
+BC_1.2_features <- rownames(BC_1.2_cellranger)
+BC_1.2 <- subset(BC_1.2, features=BC_1.2_features)
+
+rm(BC_1.1_cellranger, BC_1.2_cellranger)
+rm(BC_1.1_features, BC_1.2_features)
+```
+
+## Plot QC
+
+```{r qcplot}
+BC_1.1$percent.mt <- PercentageFeatureSet(BC_1.1, pattern = "^MT-")
+BC_1.2$percent.mt <- PercentageFeatureSet(BC_1.2, pattern = "^MT-")
+
+feats <- c("nFeature_RNA","nCount_RNA", "percent.mt")
+
+p1 <- VlnPlot(BC_1.1, features = feats, pt.size = 0, ncol = 3) + NoLegend()
+p2 <- ggplot() +
+  geom_histogram(data = BC_1.1[[]], aes(nFeature_RNA), fill = "red", alpha = 0.7, bins = 100) +
+  ggtitle("Unique genes per spot") + geom_vline(xintercept = 250, color = "black", linetype = "dashed") + coord_flip()
+bc1_1 <- p1 - p2
+
+p1 <- VlnPlot(BC_1.2, features = feats, pt.size = 0,ncol = 3) + NoLegend()
+p2 <- ggplot() +
+  geom_histogram(data = BC_1.2[[]], aes(nFeature_RNA), fill = "red", alpha = 0.7, bins = 100) +
+  ggtitle("Unique genes per spot") + geom_vline(xintercept = 250, color = "black", linetype = "dashed")  + coord_flip()
+bc1_2 <- p1 - p2
+
+bc1_1 / bc1_2
+
+#Scatterplot
+gene_attr <- do.call(rbind, lapply(unique(snBC$sample), function(i) {
+  umis <- GetAssayData(snBC, slot = "counts", assay = "RNA")[, snBC$sample %in% i]
+  gene_attr <- data.frame(gene = rownames(umis),
+                        counts = Matrix::rowSums(umis), 
+                        det_rate = Matrix::rowMeans(umis > 0),
+                        dataset = i)
+}))
+gene_attr$log10_count <- log10(gene_attr$counts + 1)
+
+Log10counts <- spread(data = gene_attr[, c(1, 4, 5)], key = "dataset", value = "log10_count")
+DetRate <- spread(data = gene_attr[, c(1, 3, 4)], key = "dataset", value = "det_rate")
+
+p1 <- ggplot(Log10counts, aes(x=BC_1.1, y=BC_1.2)) + 
+  geom_point()+
+  geom_smooth(method=lm)+
+  stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)+
+  labs(title="Log_10 counts")
+
+p2 <- ggplot(DetRate, aes(x=BC_1.1, y=BC_1.2)) + 
+  geom_point()+
+  geom_smooth(method=lm)+
+  stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)+
+  labs(title="Detection rate")
+
+p1 - p2
+```
+
+## Session info
+```{r session_info}
+sessionInfo()
+```
