@@ -79,19 +79,6 @@ MapFeatures(se_filtered, section_number = 1, ncol = 10, pt_stroke = NA,
   theme(plot.title = element_blank())
 ```
 
-## NMF gene loadings of selected factors
-
-```{r nmf_gene}
-PlotFeatureLoadings(se_filtered, 
-                    dims = c(11, 20, 17, 16, 8), 
-                    reduction = "nmf", 
-                    nfeatures = 20,
-                    mode = "dotplot", 
-                    fill = "darkmagenta",
-                    pt_size = 3,
-                    ncols = 3)
-```
-
 ## Import SIMPlex snRNAseq data
 ```{r import_sn}
 snBC_1 <- readRDS("FF_snRNA.rds")
