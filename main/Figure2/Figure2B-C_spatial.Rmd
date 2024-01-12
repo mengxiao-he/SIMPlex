@@ -1,0 +1,178 @@
+---
+title: "SIMPlex_BC_FF_Spatial"
+author: "Mengxiao"
+date: "2024-01-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+Load libraries
+
+```{r package, message='hide', results='hold'}
+suppressMessages(require(semla))
+suppressMessages(require(patchwork))
+suppressMessages(require(RcppML))
+suppressMessages(require(ggplot2))
+suppressMessages(require(ggpubr))
+suppressMessages(require(singlet))
+suppressMessages(require(tidyr))
+```
+
+## Load data
+
+```{r loaddata}
+# Load BC Visium samples
+visium.dir <- 'spatial/BC_1'
+
+samples <- list.files(visium.dir, recursive = TRUE, full.names = TRUE, pattern = 'filtered_feature_bc_matrix.h5')
+
+imgs <- list.files(visium.dir, recursive = TRUE, full.names = TRUE, pattern = 'tissue_hires_image.png')
+
+spotfiles <- list.files(visium.dir, recursive = TRUE, full.names = TRUE, pattern = 'tissue_positions.csv')
+
+json <- list.files(visium.dir, recursive = TRUE, full.names = TRUE, pattern = 'scalefactors_json.json')
+
+section.name <- samples
+section.name <- gsub(paste0(visium.dir, "/"),"", gsub("/filtered_feature_bc_matrix.h5", "", section.name))
+
+infoTable <- tibble(section.name, samples, imgs, spotfiles, json, # Add required columns
+                    sample_id = c("BC_1.1", "BC_1.2")) # Add additional column
+
+se <- ReadVisiumData(infoTable, verbose = FALSE)
+```
+
+## Filter by number of unique genes
+
+```{r filtering}
+# Filter by spots containing more than 500 genes and genes with more than 300 UMIs as well as at least 5 spots
+nCount.UMI <- Matrix::rowSums(GetAssayData(se))
+spatial.genes <- Matrix::rowSums(GetAssayData(se) > 0)
+gene.data <- data.frame(nCounts = nCount.UMI, spatial.genes = spatial.genes)
+min_expr <- gene.data$nCounts >= 300
+min_obs <- gene.data$spatial.genes >= 5
+keep.genes <- rownames(se)[min_expr & min_obs]
+se_filtered <- SubsetSTData(se, features = keep.genes, expression = nFeature_Spatial > 500)
+rm(se)
+```
+
+## Filtered feature plot
+```{r filtered_feature_plot}
+MapFeaturesSummary(se_filtered, features = "nFeature_Spatial", ncol = 2, subplot_type = "histogram")
+```
+
+## Spatial clustering
+
+```{r spatial_nmf}
+# Normalize data and find variable features for Visium data
+se_filtered <- se_filtered |>
+  NormalizeData(verbose = FALSE) |>
+  FindVariableFeatures(nfeatures = 10000, verbose = FALSE)
+
+se_filtered <- RunNMF(se_filtered, verbose = FALSE)
+
+MapFeatures(se_filtered, section_number = 1, ncol = 10, pt_stroke = NA,
+            features = paste0("NMF_", 1:40), 
+            override_plot_dims = TRUE, 
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+```
+
+## NMF gene loadings of selected factors
+
+```{r nmf_gene}
+PlotFeatureLoadings(se_filtered, 
+                    dims = c(11, 20, 17, 16, 8), 
+                    reduction = "nmf", 
+                    nfeatures = 20,
+                    mode = "dotplot", 
+                    fill = "darkmagenta",
+                    pt_size = 3,
+                    ncols = 3)
+```
+
+## Import SIMPlex snRNAseq data
+```{r import_sn}
+snBC_1 <- readRDS("FF_snRNA.rds")
+Idents(snBC_1) <- snBC_1$manual_annot_0.5
+```
+
+## Normalize data and find variable features
+
+```{r norm}
+# Rerun FindVariableFeatures to increase the number before cell type deconvolution
+snBC_1 <- snBC_1 |> 
+  FindVariableFeatures(nfeatures = 10000, verbose = FALSE)
+```
+
+## Deconvolution with NNLS using 0.5 res annotations
+```{r decon}
+DefaultAssay(se_filtered) <- "Spatial"
+
+se_filtered_0.5 <- RunNNLS(object = se_filtered, 
+                            singlecell_object = snBC_1, 
+                            groups = "manual_annot_0.5", nCells_per_group = 2000)
+```
+
+## Plot cell types 0.5 res annotations
+
+```{r cell_type_plot, fig.height=8, fig.width=12, message=FALSE, echo=FALSE, results='hide'}
+DefaultAssay(se_filtered_0.5) <- "celltypeprops"
+
+selected_celltypes <- c("Luminal epithelial 0",
+                        "Luminal epithelial 1", 
+                        "CAFs", 
+                        "Luminal epithelial 3",
+                        "Tumor-associated macrophages (TAMs)",  
+                        "Luminal epithelial 5",     
+                        "Mix-uncertain/towards immun",
+                        "CAFs-migratory/invasive phenotype",
+                        "Vascular endothelial cells",
+                        "Luminal epithelial 9",
+                        "Proliferating Cancer Cells",
+                        "Vascular smooth muscle",
+                        "Mammary epithelial: both basal and luminal cells feature",
+                        "Basal-like epithelial cells with EMT signature",
+                        "T cell",
+                        "Immune-macrophage/monocyte",
+                        "Immune-Interferon response")
+
+se_filtered_0.5 <- LoadImages(se_filtered_0.5, verbose = FALSE, image_height = 1944)
+
+plot.nnls <- MapFeatures(se_filtered_0.5, section_number = 1, pt_size = 1, 
+                       features = selected_celltypes, image_use = "raw",
+                       override_plot_dims = TRUE,
+                       colors = RColorBrewer::brewer.pal(n = 9, name = "Blues"), 
+                       scale_alpha = TRUE) & 
+  theme(legend.position = "right",
+        legend.text = element_text(angle = 0), 
+        plot.title = element_blank())
+```
+
+## Multiple cell types
+
+```{r multi_cell_type_plot, fig.height=10, fig.width=14, message=FALSE, echo=FALSE, results='hide'}
+# Plot multiple features
+MapMultipleFeatures(se_filtered_0.5, section_number = 1, 
+                    image_use = "raw", pt_stroke = NA,
+                    pt_size = 2, max_cutoff = 0.99,
+                    override_plot_dims = TRUE, 
+                    colors = c("#F8766D", "#E7851E", "#D09400", "#B2A100", "#89AC00", "#45B500", "#00BC51", "#00C087", "#00C0B2", "#00BCD6", "#00B3F2", "#29A3FF", "#9C8DFF", "#D277FF", "#F166E8", "#FF61C7", "#FF689E"),
+                    features = selected_celltypes[1:17])
+```
+
+## Save objects
+
+```{r save, warning=FALSE, eval=FALSE}
+saveRDS(se_filtered, file = "SIMPlex_BC_FF/spatial_filtered_NNLS.rds")
+```
+
+## Session info
+```{r session_info}
+sessionInfo()
+```
+
