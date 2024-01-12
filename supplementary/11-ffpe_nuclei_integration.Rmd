@@ -24,8 +24,8 @@ suppressMessages(require(scCustomize))
 
 ```{r loaddata,message='hide',warning='hide',results='hold'}
 # Load FFPE BC samples
-FFPE_BC_A <- readRDS(file = "/home/st-analysis_home/mengxiao.he/SIMPlex/analysis/SIMPlex_BC/FFPE/snBC_FFPE_A_cellbender_manual_annot.rds")
-FFPE_BC_B <- readRDS(file = "/home/st-analysis_home/mengxiao.he/SIMPlex/analysis/SIMPlex_BC/FFPE/snBC_FFPE_B_cellbender_manual_annot.rds")
+FFPE_BC_A <- readRDS(file = "FFPE_snRNA_Patient_A.rds")
+FFPE_BC_B <- readRDS(file = "FFPE_snRNA_Patient_B.rds")
 ```
 
 ## New grouped labels for better visuals on merged UMAP
