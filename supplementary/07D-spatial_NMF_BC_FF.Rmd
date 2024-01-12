@@ -1,0 +1,46 @@
+---
+title: "SIMPlex_BC_FF_Spatial_NMF"
+author: "Mengxiao"
+date: "2024-01-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r package, message='hide', results='hold'}
+suppressMessages(require(semla))
+suppressMessages(require(patchwork))
+suppressMessages(require(RcppML))
+suppressMessages(require(ggplot2))
+suppressMessages(require(singlet))
+suppressMessages(require(tidyr))
+```
+
+## Load data
+
+```{r loaddata}
+se_filtered_0.5 <- readRDS(file = "SIMPlex_BC_FF/spatial_filtered_NNLS.rds")
+```
+
+## NMF gene loadings of selected factors
+
+```{r nmf_gene}
+PlotFeatureLoadings(se_filtered, 
+                    dims = c(20, 21, 17, 8, 16), 
+                    reduction = "nmf", 
+                    nfeatures = 20,
+                    mode = "dotplot", 
+                    fill = "darkmagenta",
+                    pt_size = 3,
+                    ncols = 3)
+```
+
+## Session info
+```{r session_info}
+sessionInfo()
+```
+
