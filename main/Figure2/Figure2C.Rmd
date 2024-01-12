@@ -8,9 +8,7 @@ date: "2024-01-12"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Load libraries and data
-
-Load libraries
+## Load libraries
 
 ```{r package, message='hide',warning='hide',results='hold'}
 suppressMessages(require(Seurat))
