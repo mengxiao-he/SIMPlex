@@ -89,14 +89,15 @@ snBC_FFPE_1 <- snBC_FFPE_1 |>
   FindVariableFeatures(nfeatures = 10000, verbose = FALSE)
 ```
 
-## Deconvolution with NNLS using 0.5 res annotations
+## Deconvolution with NNLS using 0.8 res annotations
+
 ```{r decon}
 se_snBC_FFPE_A_NNLS <- RunNNLS(object = se_snBC_FFPE_1, 
                                singlecell_object = snBC_FFPE_1, 
                                groups = "manual_annot_0.8", nCells_per_group = 1000)
 ```
 
-## Plot cell types 0.5 res annotations
+## Plot cell types 0.8 res annotations
 
 ```{r cell_type_plot, fig.height=8, fig.width=12, message=FALSE, echo=FALSE, results='hide'}
 DefaultAssay(se_snBC_FFPE_A_NNLS) <- "celltypeprops"
