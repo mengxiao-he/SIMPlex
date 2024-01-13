@@ -1,0 +1,57 @@
+---
+title: "SIMPlex_FFPE_Spatial_qc"
+author: "Mengxiao"
+date: "2024-01-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r package, message='hide', results='hold'}
+suppressMessages(require(semla))
+suppressMessages(require(patchwork))
+suppressMessages(require(ggplot2))
+```
+
+## Load data
+
+```{r loaddata,message=FALSE, warning=FALSE, results='hold'}
+# Load BC Visium samples
+visium.dir <- 'BC/FFPE/spatial'
+
+samples <- list.files(visium.dir, recursive = TRUE, full.names = TRUE, pattern = 'filtered_feature_bc_matrix.h5')
+
+imgs <- list.files(visium.dir, recursive = TRUE, full.names = TRUE, pattern = 'tissue_hires_image.png')
+
+spotfiles <- list.files(visium.dir, recursive = TRUE, full.names = TRUE, pattern = 'tissue_positions.csv')
+
+json <- list.files(visium.dir, recursive = TRUE, full.names = TRUE, pattern = 'scalefactors_json.json')
+
+section.name <- samples
+section.name <- gsub(paste0(visium.dir, "/"),"", gsub("/filtered_feature_bc_matrix.h5", "", section.name))
+
+infoTable <- tibble(section.name, samples, imgs, spotfiles, json, # Add required columns
+                    sample_id = c("FFPE BC 1", "FFPE BC 2")) # Add additional column
+
+se <- ReadVisiumData(infoTable, verbose = FALSE)
+```
+
+## Vln plots for QC
+
+```{r vlnplotnew, fig.height=8, fig.width=8}
+vln.plot <- VlnPlot(se, features = c("nFeature_Spatial", "nCount_Spatial"), ncol = 2, group.by = "sample_id", pt.size = 0)
+histo.plot <- ggplot() + 
+  geom_histogram(data = se[[]], aes(nFeature_Spatial), fill = "red", alpha = 0.7, bins = 100) +
+  ggtitle("Unique genes per spot") + geom_vline(xintercept = 500, color = "black", linetype = "dashed")
+vln.plot / histo.plot
+```
+
+## Session info
+```{r session_info}
+sessionInfo()
+```
+
