@@ -1,0 +1,45 @@
+---
+title: "SIMPlex_FFPE_Spatial_nmf_loadings"
+author: "Mengxiao"
+date: "2024-01-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r package, message='hide', results='hold'}
+suppressMessages(require(semla))
+suppressMessages(require(patchwork))
+suppressMessages(require(RcppML))
+suppressMessages(require(ggplot2))
+suppressMessages(require(singlet))
+```
+
+## Load data
+
+```{r loaddata,message=FALSE, warning=FALSE, results='hold'}
+se_snBC_FFPE_A_NNLS <- readRDS(file = "SIMPlex_BC_FFPE/spatial_bc_ffpe_A_NNLS.rds")
+```
+
+## NMF gene loadings of selected factors for FFPE BC 2
+
+```{r nmf_gene, fig.width=16, fig.height=10}
+PlotFeatureLoadings(se_snBC_FFPE_A_NNLS, 
+                    dims = c(1, 2, 3, 19, 13), 
+                    reduction = "nmf", 
+                    nfeatures = 20,
+                    mode = "dotplot", 
+                    fill = "darkmagenta",
+                    pt_size = 3,
+                    ncols = 3)
+```
+
+## Session info
+```{r session_info}
+sessionInfo()
+```
+
