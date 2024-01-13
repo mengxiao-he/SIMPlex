@@ -155,24 +155,39 @@ sn.markers.1 <- FindAllMarkers(FFPE_BC_1.filt, only.pos = TRUE, min.pct = 0.25, 
 sn.markers.1_30 <- sn.markers.1 %>% filter(p_val_adj < 0.01) %>% group_by(cluster) %>% slice_max(n = 30, order_by = avg_log2FC)
 write_csv(sn.markers.1_30, file = "BC/FFPE/top30_markers_FFPE_BC_A_0.8.csv")
 
-FFPE_BC_1.filt <- RenameIdents(FFPE_BC_1.filt,
-                            "0" = "Cancer epithelial 1 (ER-positive cancer 1)",
-                            "1" = "Cancer epithelial 2",
-                            "2" = "Cancer epithelial 3",
-                            "3" = "Cancer epithelial 4",
-                            "4" = "TAM",
-                            "5" = "Luminal epithelial cells",
-                            "6" = "CAF",
-                            "7" = "Cancer epithelial 5 (ER-positive cancer 2)",
-                            "8" = "Pericytes",
-                            "9" = "T cells",
-                            "10" = "Endothelial cells",
-                            "11" = "Smooth muscle cells",
-                            "12" = "Basal epithelial cells",
-                            "13" = "Cancer epithelial 6 (Cancer undergoing EMT)",
-                            "14" = "B cells")
+FFPE_BC_1.filt <- RenameIdents(FFPE_BC_1.filt, 
+                               "0" = "CAF 1",
+                               "1" = "Cancer epithelial 1",
+                               "2" = "Cancer epithelial 2",
+                               "3" = "Cancer epithelial 3",
+                               "4" = "Stroma",
+                               "5" = "Cancer epithelial 4 (ER-positive)",
+                               "6" = "TAM",
+                               "7" = "CAF 2",
+                               "8" = "Cancer epithelial 5",
+                               "9" = "Endothelial cells",
+                               "10" = "T cells",
+                               "11" = "Myoepithelial cells",
+                               "12" = "Luminal epithelial cells",
+                               "13" = "Fibroblasts",
+                               "14" = "B cells")
 
-Idents(FFPE_BC_1.filt) <- factor(FFPE_BC_1.filt@active.ident, sort(levels(FFPE_BC_1.filt@active.ident)))
+Idents(FFPE_BC_1.filt) <- factor(FFPE_BC_1.filt@active.ident, levels = c("B cells",
+                                                                         "Fibroblasts",
+                                                                         "CAF 1",
+                                                                         "CAF 2",
+                                                                         "Cancer epithelial 1",
+                                                                         "Cancer epithelial 2",
+                                                                         "Cancer epithelial 3",
+                                                                         "Cancer epithelial 4 (ER-positive)",
+                                                                         "Cancer epithelial 5",
+                                                                         "Stroma",
+                                                                         "Endothelial cells",
+                                                                         "Luminal epithelial cells",
+                                                                         "Myoepithelial cells",
+                                                                         "T cells",
+                                                                         "TAM"))
+
 FFPE_BC_1.filt$manual_annot_0.8 <- Idents(FFPE_BC_1.filt)
 
 DimPlot(FFPE_BC_1.filt, reduction = "umap", group.by = "manual_annot_0.8")

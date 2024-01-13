@@ -37,22 +37,38 @@ DimPlot(FFPE_BC_1.filt, reduction = "umap", group.by = "manual_annot_0.8")
 ```{r markers}
 sn.markers.1_30 <- read.csv(file = "BC/FFPE/top30_markers_FFPE_BC_A_0.8.csv")
 
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "0"] <- "Cancer epithelial 1 (ER-positive cancer 1)"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "1"] <- "Cancer epithelial 2"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "2"] <- "Cancer epithelial 3"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "3"] <- "Cancer epithelial 4"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "4"] <- "TAM"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "5"] <- "Luminal epithelial cells"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "6"] <- "CAF"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "7"] <- "Cancer epithelial 5 (ER-positive cancer 2)"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "8"] <- "Pericytes"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "9"] <- "T cells"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "10"] <- "Endothelial cells"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "11"] <- "Smooth muscle cells"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "12"] <- "Basal epithelial cells"
-sn.markers.1_30$cluster[sn.markers.1_30$cluster == "13"] <- "Cancer epithelial 6 (Cancer undergoing EMT)"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "0"] <- "CAF 1"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "1"] <- "Cancer epithelial 1"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "2"] <- "Cancer epithelial 2"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "3"] <- "Cancer epithelial 3"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "4"] <- "Stroma"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "5"] <- "Cancer epithelial 4 (ER-positive)"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "6"] <- "TAM"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "7"] <- "CAF 2"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "8"] <- "Cancer epithelial 5"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "9"] <- "Endothelial cells"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "10"] <- "T cells"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "11"] <- "Myoepithelial cells"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "12"] <- "Luminal epithelial cells"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "13"] <- "Fibroblasts"
 sn.markers.1_30$cluster[sn.markers.1_30$cluster == "14"] <- "B cells"
 
+sn.markers.1_30$cluster <- as.factor(sn.markers.1_30$cluster)
+sn.markers.1_30$cluster <- factor(sn.markers.1_30$cluster, levels = c("B cells",
+                                                                      "Fibroblasts",
+                                                                      "CAF 1",
+                                                                      "CAF 2",
+                                                                      "Cancer epithelial 1",
+                                                                      "Cancer epithelial 2",
+                                                                      "Cancer epithelial 3",
+                                                                      "Cancer epithelial 4 (ER-positive)",
+                                                                      "Cancer epithelial 5",
+                                                                      "Stroma",
+                                                                      "Endothelial cells",
+                                                                      "Luminal epithelial cells",
+                                                                      "Myoepithelial cells",
+                                                                      "T cells",
+                                                                      "TAM"))
 bc_1_top5 <- sn.markers.1_30 %>%
   group_by(cluster) %>%
   arrange(cluster) %>%
