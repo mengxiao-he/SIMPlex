@@ -1,0 +1,191 @@
+---
+title: "SIMPlex_FFPE_sn_A"
+author: "Mengxiao"
+date: "2023-11-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r package, message='hide',warning='hide',results='hold'}
+suppressMessages(require(Seurat))
+suppressMessages(require(Matrix))
+suppressMessages(require(tidyverse))
+suppressMessages(require(patchwork))
+suppressMessages(require(ggplot2))
+suppressMessages(require(DoubletFinder))
+suppressMessages(require(scCustomize))
+```
+
+## Load cellbender data
+
+```{r loaddata}
+# Load BC samples
+FFPE_BC_1_cellbender <- Read_CellBender_h5_Mat(file_name = "BC/FFPE/patient_A_cellbender_filtered.h5", use.names = TRUE)
+FFPE_BC_1 <- suppressWarnings(CreateSeuratObject(FFPE_BC_1_cellbender,  project = "SIMPlex_FFPE"))
+FFPE_BC_1$sample <- "FFPE_A"
+
+rm(FFPE_BC_1_cellbender)
+```
+
+## Filter based on 10x CellRanger fixed filtering and merge
+
+```{r filtering}
+FFPE_BC_1_cellranger <- Seurat::Read10X_h5(
+  filename = "BC/FFPE/patient_A/sample_filtered_feature_bc_matrix.h5",
+  use.names = T)
+FFPE_BC_1_cellranger <- CreateSeuratObject(FFPE_BC_1_cellranger,  project = "SIMPlex_FFPE")
+FFPE_BC_1_cellranger$sample <- "BC_A"
+
+BC_1_features <- rownames(FFPE_BC_1_cellranger)
+FFPE_BC_1 <- subset(FFPE_BC_1, features=BC_1_features)
+
+rm(FFPE_BC_1_cellranger, BC_1_features)
+```
+
+## Filtering (number of cells removed)
+
+```{r qc_filtering}
+selected_c <- WhichCells(FFPE_BC_1, expression = nFeature_RNA > 250)
+selected_f <- rownames(FFPE_BC_1)[ Matrix::rowSums(FFPE_BC_1) > 3]
+FFPE_BC_1.filt <- subset(FFPE_BC_1, features=selected_f, cells=selected_c)
+
+length(colnames(FFPE_BC_1)) - length(colnames(FFPE_BC_1.filt))
+rm(FFPE_BC_1)
+```
+
+## Normalize
+
+```{r norm}
+FFPE_BC_1.filt <- SCTransform(FFPE_BC_1.filt, vst.flavor="v2", verbose = FALSE)
+```
+
+## PCA
+
+```{r pca}
+FFPE_BC_1.filt <- RunPCA(FFPE_BC_1.filt, features = VariableFeatures(object = FFPE_BC_1.filt), verbose = FALSE)
+```
+
+## Dimensionality check
+
+```{r elbow_plot_1}
+ElbowPlot(FFPE_BC_1.filt, reduction = "pca", ndims = 50)
+```
+
+## UMAP
+
+```{r umap}
+FFPE_BC_1.filt <- RunUMAP(FFPE_BC_1.filt, dims = 1:30, verbose = FALSE)
+
+DimPlot(FFPE_BC_1.filt, reduction = 'umap', label = FALSE) + ggtitle("FFPE BC A")
+
+```
+
+## Predict dublets
+
+```{r doubletfinder}
+# Run parameter optimization with paramSweep
+
+sweep.res <- paramSweep_v3(FFPE_BC_1.filt, PCs = 1:30, sct = TRUE)
+sweep.stats <- summarizeSweep(sweep.res, GT = FALSE)
+bcmvn <- find.pK(sweep.stats)
+barplot(bcmvn$BCmetric, names.arg = bcmvn$pK, las=2)
+BC_pK <- bcmvn$pK[which.max(bcmvn$BCmetric)]
+
+# define the expected number of doublet cellscells.
+nExp <- round(ncol(FFPE_BC_1.filt)* 0.08) # expect 8% doublets
+FFPE_BC_1.filt <- doubletFinder_v3(FFPE_BC_1.filt, pN=0.25, pK = BC_pK, nExp = nExp, PCs = 1:30, sct = TRUE)
+```
+
+## Doublet removal
+
+```{r filter.doublets}
+#Filter data
+FFPE_BC_1.filt = FFPE_BC_1.filt[,FFPE_BC_1.filt@meta.data[,DF.name.1] == "Singlet"]
+```
+
+## Normalize, highly variable features, scaling and PCA
+
+```{r pre-proc}
+FFPE_BC_1.filt <- SCTransform(FFPE_BC_1.filt, vst.flavor="v2", verbose = FALSE)
+FFPE_BC_1.filt <- RunPCA(FFPE_BC_1.filt, features = VariableFeatures(object = FFPE_BC_1.filt), verbose = FALSE)
+```
+
+## Dimensionality check
+
+```{r elbow_plot_2}
+ElbowPlot(FFPE_BC_1.filt, reduction = "pca", ndims = 50)
+```
+
+## UMAP
+
+```{r umap_deduped}
+FFPE_BC_1.filt <- RunUMAP(FFPE_BC_1.filt, dims = 1:30, verbose = FALSE)
+```
+
+## Find neighbours & Cluster
+
+```{r neightbours_cluster}
+FFPE_BC_1.filt <- FindNeighbors(FFPE_BC_1.filt, dims = 1:30, verbose = FALSE)
+
+for (res in c(0.1, 0.25, .5, 0.8, 1, 1.25)){
+  FFPE_BC_1.filt <- FindClusters(FFPE_BC_1.filt, resolution = res , algorithm = 1, verbose = FALSE)
+}
+
+d1 <- DimPlot(FFPE_BC_1.filt, reduction = "umap", group.by = "SCT_snn_res.0.1", label = TRUE) + 
+  DimPlot(FFPE_BC_1.filt, reduction = "umap", group.by = "SCT_snn_res.0.25", label = TRUE) + 
+  DimPlot(FFPE_BC_1.filt, reduction = "umap", group.by = "SCT_snn_res.0.5", label = TRUE)
+d2 <- DimPlot(FFPE_BC_1.filt, reduction = "umap", group.by = "SCT_snn_res.0.8", label = TRUE) + 
+  DimPlot(FFPE_BC_1.filt, reduction = "umap", group.by = "SCT_snn_res.1", label = TRUE) + 
+  DimPlot(FFPE_BC_1.filt, reduction = "umap", group.by = "SCT_snn_res.1.25", label = TRUE)
+
+d1 / d2 + plot_annotation(title = "FFPE BC 1")
+```
+
+## Cluster markers
+
+```{r markers}
+Idents(FFPE_BC_1.filt) <- FFPE_BC_1.filt$SCT_snn_res.0.8
+
+sn.markers.1 <- FindAllMarkers(FFPE_BC_1.filt, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25, verbose = FALSE)
+sn.markers.1_30 <- sn.markers.1 %>% filter(p_val_adj < 0.01) %>% group_by(cluster) %>% slice_max(n = 30, order_by = avg_log2FC)
+write_csv(sn.markers.1_30, file = "BC/FFPE/top30_markers_FFPE_BC_A_0.8.csv")
+
+FFPE_BC_1.filt <- RenameIdents(FFPE_BC_1.filt,
+                            "0" = "Cancer epithelial 1 (ER-positive cancer 1)",
+                            "1" = "Cancer epithelial 2",
+                            "2" = "Cancer epithelial 3",
+                            "3" = "Cancer epithelial 4",
+                            "4" = "TAM",
+                            "5" = "Luminal epithelial cells",
+                            "6" = "CAF",
+                            "7" = "Cancer epithelial 5 (ER-positive cancer 2)",
+                            "8" = "Pericytes",
+                            "9" = "T cells",
+                            "10" = "Endothelial cells",
+                            "11" = "Smooth muscle cells",
+                            "12" = "Basal epithelial cells",
+                            "13" = "Cancer epithelial 6 (Cancer undergoing EMT)",
+                            "14" = "B cells")
+
+Idents(FFPE_BC_1.filt) <- factor(FFPE_BC_1.filt@active.ident, sort(levels(FFPE_BC_1.filt@active.ident)))
+FFPE_BC_1.filt$manual_annot_0.8 <- Idents(FFPE_BC_1.filt)
+
+DimPlot(FFPE_BC_1.filt, reduction = "umap", group.by = "manual_annot_0.8")
+```
+
+## Save object
+
+```{r save_RDS, eval=FALSE}
+saveRDS(FFPE_BC_1.filt, file = "BC/FFPE/FFPE_snRNA_Patient_A.rds")
+```
+
+##Session info
+
+```{r session_info}
+sessionInfo()
+```

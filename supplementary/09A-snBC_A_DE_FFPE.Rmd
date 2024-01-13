@@ -1,0 +1,85 @@
+---
+title: "SIMPlex_FFPE_sn"
+author: "Mengxiao"
+date: "2024-01-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r package, message='hide',warning='hide',results='hold'}
+suppressMessages(require(Seurat))
+suppressMessages(require(Matrix))
+suppressMessages(require(tidyverse))
+suppressMessages(require(patchwork))
+suppressMessages(require(ggplot2))
+```
+
+## Load data
+
+```{r loaddata}
+FFPE_BC_1.filt <- readRDS(file = "BC/FFPE/FFPE_snRNA_Patient_A.rds")
+```
+
+## UMAP plot
+
+```{r umap}
+Idents(FFPE_BC_1.filt) <- FFPE_BC_1.filt$manual_annot_0.8
+DimPlot(FFPE_BC_1.filt, reduction = "umap", group.by = "manual_annot_0.8")
+```
+
+## Cluster markers
+
+```{r markers}
+sn.markers.1_30 <- read.csv(file = "BC/FFPE/top30_markers_FFPE_BC_A_0.8.csv")
+
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "0"] <- "Cancer epithelial 1 (ER-positive cancer 1)"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "1"] <- "Cancer epithelial 2"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "2"] <- "Cancer epithelial 3"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "3"] <- "Cancer epithelial 4"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "4"] <- "TAM"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "5"] <- "Luminal epithelial cells"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "6"] <- "CAF"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "7"] <- "Cancer epithelial 5 (ER-positive cancer 2)"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "8"] <- "Pericytes"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "9"] <- "T cells"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "10"] <- "Endothelial cells"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "11"] <- "Smooth muscle cells"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "12"] <- "Basal epithelial cells"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "13"] <- "Cancer epithelial 6 (Cancer undergoing EMT)"
+sn.markers.1_30$cluster[sn.markers.1_30$cluster == "14"] <- "B cells"
+
+bc_1_top5 <- sn.markers.1_30 %>%
+  group_by(cluster) %>%
+  arrange(cluster) %>%
+  top_n(wt = avg_log2FC, n = 5)
+
+DotPlot(FFPE_BC_1.filt, 
+        features = unique(bc_1_top5$gene), 
+        col.min = 0, 
+        dot.min = 0, 
+        dot.scale = 5,
+        group.by = "manual_annot_0.8") +
+  RotatedAxis() + 
+  xlab('Marker genes') + 
+  ylab('Samples') + 
+  scale_y_discrete(limits=rev) + 
+  scale_x_discrete(position = "top") + 
+  theme(text = element_text(size = 10), 
+        axis.text.x=element_text(size=14),
+        axis.text.x.top = element_text(margin = margin(b = 1), hjust = 0),
+        axis.text.y=element_text(size=12), 
+        legend.direction="horizontal", 
+        legend.position = "top",
+        plot.margin = margin(t = 20, r = 20, b = 20, l = 20, unit = "pt"))
+```
+
+## Session info
+
+```{r session_info}
+sessionInfo()
+```

@@ -1,0 +1,82 @@
+---
+title: "SIMPlex_FFPE_sn_qc"
+author: "Mengxiao"
+date: "2024-01-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r package, message='hide',warning='hide',results='hold'}
+suppressMessages(require(Seurat))
+suppressMessages(require(Matrix))
+suppressMessages(require(tidyverse))
+suppressMessages(require(patchwork))
+suppressMessages(require(ggplot2))
+suppressMessages(require(ggpubr))
+suppressMessages(require(scCustomize))
+```
+
+## Load cellbender data
+
+```{r loaddata}
+# Load BC samples
+FFPE_BC_1_cellbender <- Read_CellBender_h5_Mat(file_name = "BC/FFPE/patient_A_cellbender_filtered.h5", use.names = TRUE)
+FFPE_BC_1 <- suppressWarnings(CreateSeuratObject(FFPE_BC_1_cellbender,  project = "SIMPlex_FFPE"))
+FFPE_BC_1$sample <- "FFPE_A"
+
+FFPE_BC_2_cellbender <- Read_CellBender_h5_Mat(file_name = "BC/FFPE/patient_B_cellbender_filtered.h5", use.names = TRUE)
+FFPE_BC_2 <- suppressWarnings(CreateSeuratObject(FFPE_BC_2_cellbender,  project = "SIMPlex_FFPE"))
+FFPE_BC_2$sample <- "FFPE_B"
+
+rm(FFPE_BC_1_cellbender, FFPE_BC_2_cellbender)
+```
+
+## Filter based on 10x CellRanger fixed filtering and merge
+
+```{r filtering}
+FFPE_BC_1_cellranger <- Seurat::Read10X_h5(
+  filename = "BC/FFPE/patient_A/sample_filtered_feature_bc_matrix.h5",
+  use.names = T)
+FFPE_BC_1_cellranger <- CreateSeuratObject(FFPE_BC_1_cellranger,  project = "SIMPlex_FFPE")
+FFPE_BC_1_cellranger$sample <- "BC_A"
+
+FFPE_BC_2_cellranger <- Seurat::Read10X_h5(
+  filename = "BC/FFPE/patient_B/sample_filtered_feature_bc_matrix.h5",
+  use.names = T)
+FFPE_BC_2_cellranger <- CreateSeuratObject(FFPE_BC_2_cellranger,  project = "SIMPlex_FFPE")
+FFPE_BC_2_cellranger$sample <- "BC_B"
+
+BC_1_features <- rownames(FFPE_BC_1_cellranger)
+FFPE_BC_1 <- subset(FFPE_BC_1, features=BC_1_features)
+
+BC_2_features <- rownames(FFPE_BC_2_cellranger)
+FFPE_BC_2 <- subset(FFPE_BC_2, features=BC_2_features)
+
+rm(FFPE_BC_1_cellranger, FFPE_BC_2_cellranger, BC_1_features, BC_2_features)
+```
+
+## Plot QC
+
+```{r qcplot}
+feats <- c("nFeature_RNA","nCount_RNA")
+
+#Merged
+snBC_FFPE <- merge(FFPE_BC_1, FFPE_BC_2, add.cell.ids = c("FFPE_BC_1", "FFPE_BC_2"), project = "SIMPlex_BC_FFPE")
+
+vln.plot <- VlnPlot(snBC_FFPE, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, group.by = "sample", pt.size = 0)
+histo.plot <- ggplot() + 
+  geom_histogram(data = snBC_FFPE[[]], aes(nFeature_RNA), fill = "red", alpha = 0.7, bins = 100) +
+  ggtitle("Unique genes per spot") + geom_vline(xintercept = 250, color = "black", linetype = "dashed")
+vln.plot / histo.plot
+```
+
+## Session info
+
+```{r session_info}
+sessionInfo()
+```
