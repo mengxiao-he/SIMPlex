@@ -24,7 +24,7 @@ suppressMessages(require(tidyr))
 
 ```{r loaddata}
 # Load BC Visium samples
-visium.dir <- 'spatial/BC_1'
+visium.dir <- 'BC/FF/spatial'
 
 samples <- list.files(visium.dir, recursive = TRUE, full.names = TRUE, pattern = 'filtered_feature_bc_matrix.h5')
 
