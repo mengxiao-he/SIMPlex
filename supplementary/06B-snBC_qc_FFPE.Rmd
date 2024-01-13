@@ -17,7 +17,6 @@ suppressMessages(require(Matrix))
 suppressMessages(require(tidyverse))
 suppressMessages(require(patchwork))
 suppressMessages(require(ggplot2))
-suppressMessages(require(ggpubr))
 suppressMessages(require(scCustomize))
 ```
 
