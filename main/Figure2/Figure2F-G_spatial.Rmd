@@ -69,7 +69,7 @@ se_filtered <- se_filtered |>
 se_filtered <- RunNMF(se_filtered, verbose = FALSE)
 
 MapFeatures(se_filtered, ncol = 5,
-            features = paste0("NMF_", 1:20),
+            features = paste0("NMF_", 1:18),
             override_plot_dims = TRUE, pt_stroke = NA,
             colors = viridis::magma(n = 11, direction = -1)) &
   theme(plot.title = element_blank())
