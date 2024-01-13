@@ -99,7 +99,7 @@ se_snBC_FFPE_A_NNLS <- RunNNLS(object = se_filtered,
 
 ## Plot cell types 0.8 res annotations
 
-```{r cell_type_plot, fig.height=8, fig.width=12, message=FALSE, echo=FALSE, results='hide'}
+```{r cell_type_plot}
 DefaultAssay(se_snBC_FFPE_A_NNLS) <- "celltypeprops"
 
 se_snBC_FFPE_A_NNLS <- LoadImages(se_snBC_FFPE_A_NNLS, verbose = FALSE, image_height = 2000)
@@ -131,7 +131,7 @@ MapFeatures(se_snBC_FFPE_A_NNLS, pt_size = 1.3,
 ```
 
 ## Multiple cell types
-```{r multi_cell_type_plot, fig.height=8, fig.width=11, message=FALSE, echo=FALSE, results='hide'}
+```{r multi_cell_type_plot}
 # Plot multiple features
 MapMultipleFeatures(se_snBC_FFPE_A_NNLS, 
                     image_use = "raw", 
@@ -144,7 +144,7 @@ MapMultipleFeatures(se_snBC_FFPE_A_NNLS,
 
 ## Save objects
 
-```{r save, warning=FALSE, eval=FALSE}
+```{r save}
 saveRDS(se_snBC_FFPE_A_NNLS, file = "SIMPlex_BC_FFPE/spatial_bc_ffpe_A_NNLS.rds")
 ```
 
